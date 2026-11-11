@@ -687,7 +687,8 @@
   let lasers = []; // Laser-Hindernisse, die der Boss erzeugt
   let hole = null;       // „Blockloch“ im Boden – der einzige Ausweg bei der Verfolgung
   let voidT = 0;         // Zeit im Fall durch die Leere
-  let voidPortal = null; // Portal in die Wasserwelt
+  let voidPortal = null; // Portal in die neue Welt
+  let voidChaser = null; // Boss, der dir im Schacht hinterherkrabbelt
   let cameo = null;      // Viktor fliegt auf dem Joyor-Roller vorbei
   let cameoT = 12;
 
@@ -711,6 +712,7 @@
     hole = null;
     voidT = 0;
     voidPortal = null;
+    voidChaser = null;
     cameo = null;
     cameoT = 10 + Math.random() * 10;
     popups = [];
@@ -840,18 +842,22 @@
     lasers = [];
     cols = [];
     boss = null;
+    // der Boss krabbelt dir kopfüber durch den Schacht hinterher
+    voidChaser = { kind, phase: "chase", face: 1, x: W / 2 + 20, y: -170, t: 0, headGrow: 0, mindK: 0, leaving: 0, say: null, sayT: 0, scream: false, noLabel: true };
     bee.y = 30;
     bee.vy = 150;
     flash = 1;
     flashColor = passage().flash;
     sfx.portal();
     popups.push({ text: passage().name, x: W / 2, y: 300, t: 0, size: 34 });
-    popups.push({ text: `${bossName(kind)}: „Neiiin!“`, x: W / 2, y: 350, t: 0, size: 20 });
+    popups.push({ text: `${bossName(kind)} krabbelt dir hinterher!`, x: W / 2, y: 350, t: 0, size: 20 });
   }
 
   // Durch das Portal am Ende des Durchgangs: Ankunft in einer neuen Welt
   function enterWater() {
     const p = passage(), kind = bossKind();
+    if (voidChaser) popups.push({ text: `${bossName(voidChaser.kind)}: „Neiiin!“`, x: W / 2, y: 390, t: 0, size: 20 });
+    voidChaser = null;
     world = p.to;
     spawnWorld = p.to;
     mode = 'cols';
@@ -971,14 +977,15 @@
       b.x += b.vx * dt;
       if (b.x > W + 140) {
         b.phase = 'chase';
-        b.x = -120;
+        b.x = -70;  // krabbelt gleich ins Bild – deine Figur rückt dafür nach rechts
         b.holeT = 1.2;
         b.talkT = 0.4;
       }
     } else {
       // Verfolgung: Viktor krabbelt dir hinterher und kommt langsam näher
       b.face = 1;
-      b.x += 16 * dt;
+      // erst schnell ins Bild hinein (bis er komplett zu sehen ist), dann langsam näher
+      b.x += (b.x < 64 ? 95 : 16) * dt;
       b.y = H - GROUND_H - 24 + Math.sin(time * 14) * 2;
       b.talkT -= dt;
       if (b.talkT <= 0) {
@@ -1043,12 +1050,23 @@
       bee.y = clamp(bee.y + bee.vy * dt, 60, 380);
       bee.rot = Math.sin(time * 3) * 0.4;
       if (voidT > 2.5 && !voidPortal) voidPortal = { y: H + 70 };
+      if (voidChaser) {
+        // kommt gefährlich nah, erwischt dich aber nicht
+        const c = voidChaser;
+        c.t += dt;
+        c.y += (bee.y - 165 + Math.sin(c.t * 2.2) * 18 - c.y) * Math.min(1, dt * 1.6);
+        c.x = W / 2 + 20 + Math.sin(c.t * 1.3) * 30;
+      }
       if (voidPortal) {
         voidPortal.y -= 170 * dt;
         if (voidPortal.y <= bee.y + 18) enterWater();
       }
       return;
     }
+
+    // Bei der Verfolgung rückt die Spielfigur nach rechts, damit der Boss ganz zu sehen ist
+    const homeX = boss && (boss.phase === "chase" || boss.phase === "swap") ? 240 : 110;
+    bee.x += (homeX - bee.x) * Math.min(1, dt * 2);
 
     // Biene: Schwerkraft
     bee.vy = Math.min(bee.vy + GRAVITY * dt, MAX_FALL);
@@ -1969,8 +1987,8 @@
     b.headX = b.x + (b.face > 0 ? -hx : hx);
     b.headY = b.y + hy;
     const nameY = b.headY - 40 * s;
-    text('Viktor', b.headX, nameY, 13 + (s - 1) * 5, '#ffffff', '#2a2622');
-    speech(b, nameY);
+    if (!b.noLabel) text('Viktor', b.headX, nameY, 13 + (s - 1) * 5, '#ffffff', '#2a2622');
+    if (!b.noLabel) speech(b, nameY);
 
     // Langer, heller Kopf mit Zylinder, schwarzen Augenhöhlen und kleinen weißen Pupillen
     function drawVHead(x, y, rot, sc) {
@@ -2174,8 +2192,8 @@
 
     b.headX = b.x;
     b.headY = b.y - 82 + bounce;
-    text('Daniel', b.headX, b.headY - 24, 14, '#ffffff', '#2e221e');
-    speech(b, b.headY - 24);
+    if (!b.noLabel) text('Daniel', b.headX, b.headY - 24, 14, '#ffffff', '#2e221e');
+    if (!b.noLabel) speech(b, b.headY - 24);
   }
 
   // Sprechblase über einem Boss – gerade und immer im Bild
@@ -2508,8 +2526,20 @@
     if (boss) drawBoss();
     drawLasers();
     drawProjectiles();
-    if (mode === 'void') drawVoidFall();
-    else drawGround();
+    if (mode === 'void') {
+      drawVoidFall();
+      if (voidChaser) {
+        // Boss im Schacht: um 90 Grad gedreht, krabbelt kopfüber nach unten
+        ctx.save();
+        ctx.translate(voidChaser.x, voidChaser.y);
+        ctx.rotate(Math.PI / 2);
+        const saved = { x: voidChaser.x, y: voidChaser.y };
+        voidChaser.x = 0; voidChaser.y = 0;
+        drawBoss(voidChaser);
+        voidChaser.x = saved.x; voidChaser.y = saved.y;
+        ctx.restore();
+      }
+    } else drawGround();
     drawBee();
     if (boss && boss.mindK > 0.02 && boss.headX !== undefined) drawMindControl();
     drawUI();
