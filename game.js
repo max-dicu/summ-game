@@ -88,9 +88,13 @@
 
   // Einmaliger Bonus-Start bei 100 über einen geheimen Link (pro Gerät nur ein einziges Mal).
   // Der Bonus gilt als verbraucht, sobald man losspielt – danach startet das Spiel hier nie wieder bei 100.
-  const BONUS_KEY = 'summ-bonus-100-used';
+  // jeder Bonus-Link hat einen eigenen Code und wird pro Gerät nur einmal anerkannt
+  const BONUS_CODES = { 'KV7-Q2M-100': 'summ-bonus-100-used', 'R4T-Z8N-100': 'summ-bonus-100-used-2' };
+  let BONUS_KEY = 'summ-bonus-100-used';
   let bonusStart = 0;
-  if (new URLSearchParams(location.search).get('bonus') === 'KV7-Q2M-100') {
+  const bonusCode = new URLSearchParams(location.search).get('bonus');
+  if (bonusCode && BONUS_CODES[bonusCode]) {
+    BONUS_KEY = BONUS_CODES[bonusCode];
     try { if (!localStorage.getItem(BONUS_KEY)) bonusStart = 100; } catch (e) {}
     // geheimen Teil aus der Adresse entfernen
     try { const u = new URL(location.href); u.searchParams.delete('bonus'); history.replaceState(null, '', u.pathname + u.search); } catch (e) {}
