@@ -90,14 +90,20 @@
   // Der Bonus gilt als verbraucht, sobald man losspielt – danach startet das Spiel hier nie wieder bei 100.
   // jeder Bonus-Link hat einen eigenen Code und wird pro Gerät nur einmal anerkannt
   // Wert = [Speicher-Schlüssel, wie oft der Link pro Gerät funktioniert]
-  const BONUS_CODES = { 'KV7-Q2M-100': ['summ-bonus-100-used', 1], 'R4T-Z8N-100': ['summ-bonus-100-used-2', 1], 'W5H-J9D-5X': ['summ-bonus-5x-count', 5] };
-  let BONUS_KEY = 'summ-bonus-100-used', bonusLeft = 0;
+  // Wert = [Speicher-Schlüssel, wie oft pro Gerät, welcher Boss]
+  const BONUS_CODES = {
+    'KV7-Q2M-100': ['summ-bonus-100-used', 1, 'viktor'],
+    'R4T-Z8N-100': ['summ-bonus-100-used-2', 1, 'viktor'],
+    'D4N-C8P-2X': ['summ-bonus-daniel-count', 2, 'daniel'],
+  };
+  let BONUS_KEY = 'summ-bonus-100-used', bonusLeft = 0, bonusKind = 'viktor';
   let bonusStart = 0;
   const bonusCode = new URLSearchParams(location.search).get('bonus');
   if (bonusCode && BONUS_CODES[bonusCode]) {
-    const [key, max] = BONUS_CODES[bonusCode];
-    BONUS_KEY = key;
-    try { const used = Number(localStorage.getItem(key)) || 0; if (used < max) { bonusStart = 100; bonusLeft = max - used; } } catch (e) {}
+    const [key, max, kind] = BONUS_CODES[bonusCode];
+    BONUS_KEY = key; bonusKind = kind;
+    // Viktor kommt bei 100, Daniel bei 200
+    try { const used = Number(localStorage.getItem(key)) || 0; if (used < max) { bonusStart = kind === 'daniel' ? 200 : 100; bonusLeft = max - used; } } catch (e) {}
     // geheimen Teil aus der Adresse entfernen
     try { const u = new URL(location.href); u.searchParams.delete('bonus'); history.replaceState(null, '', u.pathname + u.search); } catch (e) {}
   }
@@ -732,12 +738,12 @@
     cameo = null;
     cameoT = 10 + Math.random() * 10;
     popups = [];
-    bossLevel = START_CYCLE;
+    bossLevel = bonusStart ? (bonusKind === 'daniel' ? 1 : 0) : START_CYCLE;
     nextBossAt = (Math.floor(score / BOSS_EVERY) + 1) * BOSS_EVERY;
     pollenT = 0;
     warnT = 0;
     // im Testmodus mit level=… in der Welt starten, in der man nach dem vorigen Boss ankommt
-    world = bonusStart ? 'fire' : START_CYCLE > 0 ? PASSAGES[(START_CYCLE - 1) % PASSAGES.length].to : 'over';
+    world = bonusStart ? (bonusKind === 'daniel' ? 'swamp' : 'fire') : START_CYCLE > 0 ? PASSAGES[(START_CYCLE - 1) % PASSAGES.length].to : 'over';
     spawnWorld = world;
     setTrack('calm');
   }
@@ -773,7 +779,7 @@
         bonusStart = 0;
         mode = 'bossIntro';
         warnT = 2.5;
-        flash = 1; flashColor = '170,80,255';
+        flash = 1; flashColor = bonusKind === 'daniel' ? '110,190,70' : '170,80,255';
         sfx.portal(); setTrack('boss'); setTimeout(sfx.warn, 400);
       } else spawnNext(W + 40);
       bee.vy = FLAP_V;
@@ -1155,7 +1161,8 @@
       if (!cameo) {
         cameoT -= dt;
         if (cameoT <= 0) {
-          const kind = world === 'over' || Math.random() < 0.5 ? 'viktor' : 'daniel';
+          // pro Welt abwechselnd: 1. Welt Viktor auf seinem JOYOR, 2. Welt nur Daniel auf seinem Capybara, 3. wieder Viktor …
+          const kind = bossLevel % 2 === 0 ? 'viktor' : 'daniel';
           cameo = { kind, x: -150, y: 150 + Math.random() * 110, baseY: 0, vx: kind === 'daniel' ? 190 : 210, t: 0, phase: 'ride', face: 1,
             leaving: 0, headGrow: 0, mindK: 0, say: null, sayT: 0, scream: false };
           if (kind === 'daniel') cameo.y = H - GROUND_H - 22;
@@ -2474,7 +2481,10 @@
       ctx.globalAlpha = 1;
       if (best > 0) text(`Rekord: ${best}`, W / 2, 420, 18);
       if (START_SCORE > 0) text(`Testmodus: Start bei ${START_SCORE}`, W / 2, 450, 14, '#ffb0b0');
-      if (bonusStart) text(bonusLeft > 1 ? `⭐ Bonus: direkt zu Viktor! (noch ${bonusLeft} mal) ⭐` : '⭐ Bonus: direkt zu Viktor! (letztes Mal) ⭐', W / 2, 455, 15, '#ffe14d');
+      if (bonusStart) {
+        const who = bonusKind === 'daniel' ? 'Daniel' : 'Viktor';
+        text(bonusLeft > 1 ? `⭐ Bonus: direkt zu ${who}! (noch ${bonusLeft} mal) ⭐` : `⭐ Bonus: direkt zu ${who}! (letztes Mal) ⭐`, W / 2, 455, 15, '#ffe14d');
+      }
     } else if (state === 'playing') {
       text(String(score), W / 2, 70, 56);
 

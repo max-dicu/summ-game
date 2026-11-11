@@ -26,6 +26,8 @@ Mit jedem Boss wird Viktor verrückter, länger und sein Geweih wächst. Seine S
 
 **Wechselnde Bosse:** Bei 100, 300, 500 … kommt **Viktor** (dürr, Langkopf mit Zylinder, Spinnenarme) in der Feuerwelt. Bei 200, 400, 600 … kommt **Daniel** – muskulös, rote Augen, „DANIEL“-Gürtel – auf seinem **Capybara** im Capybara-Sumpf. Er wirft Hanteln statt Laser und jagt dich im Galopp. Beide werden mit jedem Mal stärker.
 
+**Gäste wechseln sich ab:** In der ersten Welt düst Viktor auf seinem JOYOR vorbei, in der zweiten nur Daniel auf seinem Capybara, in der dritten wieder Viktor und so weiter.
+
 **Testmodus für spätere Bosse:** `index.html?start=197&level=1` startet kurz vor dem 2. Boss (Daniel), `level=2` vor dem 3. usw.
 
 Reines HTML + CSS + JavaScript – kein Build, keine Abhängigkeiten.
