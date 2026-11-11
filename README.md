@@ -22,6 +22,12 @@ Mit jedem Boss wird Viktor verrückter, länger und sein Geweih wächst. Seine S
 
 **Testmodus:** `index.html?start=97` startet direkt mit 97 Punkten (kurz vor dem Boss) (der Rekord wird dann nicht gespeichert).
 
+**Neue Welten (alle 100 Level):** Nach jedem Boss fällst du durch einen anderen Durchgang in eine neue Welt: Sternenleere → Wasserwelt, Eisrutsche → Eiswelt, Sandstrudel → Wüstenwelt, Sporenschacht → Pilzwald, Regenbogentunnel → Wolkenwelt, Neonröhre → Neonstadt, Zuckerschlund → Bonbonwelt (danach von vorn).
+
+**Wechselnde Bosse:** Bei 100, 300, 500 … kommt **Viktor** (dürr, Langkopf mit Zylinder, Spinnenarme) in der Feuerwelt. Bei 200, 400, 600 … kommt **Daniel** – muskulös, rote Augen, „DANIEL“-Gürtel – auf seinem **Capybara** im Capybara-Sumpf. Er wirft Hanteln statt Laser und jagt dich im Galopp. Beide werden mit jedem Mal stärker.
+
+**Testmodus für spätere Bosse:** `index.html?start=197&level=1` startet kurz vor dem 2. Boss (Daniel), `level=2` vor dem 3. usw.
+
 Reines HTML + CSS + JavaScript – kein Build, keine Abhängigkeiten.
 
 ## Lokal spielen

@@ -38,6 +38,18 @@
   // Jeder Boss heißt Viktor – und mit jedem Mal wird er verrückter (0 = normal, 8 = völlig durchgedreht)
   const crazy = () => Math.min(bossLook, 8);
 
+  // Daniel (reitet auf einem Capybara) wird mit jedem Mal stärker – bleibt auch nach Neustart
+  let danielLook = 0;
+  try { danielLook = Number(localStorage.getItem('summ-daniel-look')) || 0; } catch (e) {}
+  function saveDanielLook() {
+    try { localStorage.setItem('summ-daniel-look', String(danielLook)); } catch (e) {}
+  }
+  const DANIEL_FAREWELLS = [
+    'Ich geh erstmal pumpen!', 'Capy, nach Hause!', 'Nächstes Mal stemme ich dich!',
+    'Beintag verpasst!', 'Proteinpause!', 'Wir sehen uns im Gym!', 'Capybara, gib Gas!',
+  ];
+  const DANIEL_CHASE = ['Lauf, Capy, lauf!', 'Ich stemme dich!', 'Nur noch ein Satz!', 'Capybara-Power!', 'Du entkommst mir nicht!'];
+
   // Abschiedssprüche – jedes Mal ein anderer
   const FAREWELLS = [
     'Ich komme wieder!', 'Preis-Leistung von Joyor!', 'Das war nur zum Aufwärmen!',
@@ -51,11 +63,12 @@
     'Joyor Preis-Leistung!', 'Mir ist schwindelig!', 'Lalalala!', 'Rundherum!',
   ];
   let lastFarewell = '';
-  function pickFarewell() {
+  function pickFarewell(kind) {
+    const list = kind === 'daniel' ? DANIEL_FAREWELLS : FAREWELLS;
     let line;
-    do { line = FAREWELLS[Math.floor(Math.random() * FAREWELLS.length)]; } while (line === lastFarewell);
+    do { line = list[Math.floor(Math.random() * list.length)]; } while (line === lastFarewell);
     lastFarewell = line;
-    return [line, 'Viktor kommt wieder – noch verrückter!'];
+    return [line, kind === 'daniel' ? 'Daniel kommt wieder – noch stärker!' : 'Viktor kommt wieder – noch verrückter!'];
   }
 
   function bossStage() {
@@ -72,6 +85,8 @@
 
   // Zum Testen: index.html?start=45 startet mit 45 Punkten (Rekord wird dann nicht gespeichert)
   const START_SCORE = Math.max(0, parseInt(new URLSearchParams(location.search).get('start'), 10) || 0);
+  // Zum Testen: index.html?start=197&level=1 startet im 2. Boss-Zyklus (Daniel), level=2 im 3. usw.
+  const START_CYCLE = Math.max(0, parseInt(new URLSearchParams(location.search).get('level'), 10) || 0);
 
   // Scharfe Darstellung auf HiDPI-Displays, Pixel-Look für Blöcke
   function setupCanvas() {
@@ -547,6 +562,23 @@
     coral: makeTex(16, (x, y, r, p) => r() < 0.18 ? '#ffd0dc' : p(['#ff6f91', '#f25c85', '#ff86a3'])),
     seaStone: makeTex(17, (x, y, r, p) => brickLine(x, y) ? '#1f5d63' : p(['#3fa7a3', '#369a96', '#4ab5b0'])),
     kelp: makeTex(18, (x, y, r, p) => x % 4 === 1 ? '#1d5c3a' : p(['#2f8f5b', '#28804f', '#379c66'])),
+    // neue Welten
+    mud: makeTex(19, (x, y, r, p) => r() < 0.15 ? '#2a1d10' : p(['#5a4128', '#4d3722', '#64492e'])),
+    reed: makeTex(20, (x, y, r, p) => x % 3 === 1 ? '#6b7a2a' : p(['#3d5a1e', '#4a6a24', '#34501a'])),
+    mossStone: makeTex(21, (x, y, r, p) => r() < 0.3 ? p(['#4a7a2a', '#3d6a22']) : p(['#6e6e66', '#7a7a70', '#62625a'])),
+    ice: makeTex(22, (x, y, r, p) => (x === y || x === y + 4) ? '#f2fbff' : p(['#a8dcf5', '#b6e4fa', '#9fd4f0'])),
+    snow: makeTex(23, (x, y, r, p) => r() < 0.12 ? '#d6e8f2' : p(['#ffffff', '#f4f9fc', '#eaf3f8'])),
+    packedIce: makeTex(24, (x, y, r, p) => brickLine(x, y) ? '#e8f8ff' : p(['#6fb7de', '#62aad2', '#7cc2e6'])),
+    sandstone: makeTex(25, (x, y, r, p) => y % 3 === 2 ? '#b8894c' : p(['#d9b071', '#cfa564', '#e0ba7d'])),
+    cactus: makeTex(26, (x, y, r, p) => x % 3 === 0 ? '#2a6a2a' : (r() < 0.08 ? '#f2f2d0' : p(['#3f8f3a', '#459a40', '#378332']))),
+    stem: makeTex(27, (x, y, r, p) => x % 4 === 3 ? '#cbbd9e' : p(['#efe6d2', '#e6dcc4', '#f4ecdb'])),
+    cap: makeTex(28, (x, y, r, p) => ((x === 2 && y === 2) || (x === 5 && y === 5) || (x === 6 && y === 1)) ? '#ffffff' : p(['#d8322a', '#c82a22', '#e23c32'])),
+    mycel: makeTex(29, (x, y, r, p) => r() < 0.12 ? '#c6f7ea' : p(['#5a4a6a', '#64527a', '#4f4160'])),
+    cloud: makeTex(30, (x, y, r, p) => r() < 0.1 ? '#dfe8f5' : p(['#ffffff', '#f6f9ff', '#eef3fb'])),
+    neon: makeTex(31, (x, y, r, p) => (x === 0 || y === 0) ? '#ff3cdc' : p(['#140a2e', '#1a0d3a', '#100826'])),
+    neonEdge: makeTex(32, (x, y, r, p) => (y === 3 || y === 4) ? '#ffffff' : p(['#3cf2ff', '#2ad8f0', '#5af7ff'])),
+    candy: makeTex(33, (x, y, r, p) => ((x + y) % 4 < 2) ? '#ffffff' : p(['#ff5aa8', '#ff6fb4', '#f2489a'])),
+    choco: makeTex(34, (x, y, r, p) => (x % 4 === 0 || y % 4 === 0) ? '#3a1f10' : p(['#6a3a1e', '#5e3218', '#744222'])),
   };
 
   // =====================================================================
@@ -593,7 +625,43 @@
         { body: 'sand', edge: 'seaStone' },
       ],
     },
+    // Daniels Arena
+    swamp: {
+      name: 'Capybara-Sumpf',
+      ground: ['mud', 'mud'],
+      cols: [{ body: 'mossStone' }, { body: 'mud', edge: 'reed' }, { body: 'log', edge: 'leaves' }],
+    },
+    ice: { name: 'Eiswelt', ground: ['snow', 'packedIce'], cols: [{ body: 'ice' }, { body: 'packedIce', edge: 'snow' }, { body: 'ice', edge: 'snow' }] },
+    desert: { name: 'Wüstenwelt', ground: ['sand', 'sandstone'], cols: [{ body: 'sandstone' }, { body: 'cactus' }, { body: 'sandstone', edge: 'sand' }] },
+    shroom: { name: 'Pilzwald', ground: ['mycel', 'mycel'], cols: [{ body: 'stem', edge: 'cap' }, { body: 'mycel' }, { body: 'stem', edge: 'cap', edgeBot: 'mycel' }] },
+    sky: { name: 'Wolkenwelt', ground: ['cloud', 'cloud'], cols: [{ body: 'cloud' }, { body: 'paleStone', edge: 'cloud' }, { body: 'cloud', edge: 'glow' }] },
+    neon: { name: 'Neonstadt', ground: ['neon', 'neon'], cols: [{ body: 'neon', edge: 'neonEdge' }, { body: 'obsidian', edge: 'neonEdge' }, { body: 'neon' }] },
+    candy: { name: 'Bonbonwelt', ground: ['candy', 'choco'], cols: [{ body: 'candy' }, { body: 'choco', edge: 'candy' }, { body: 'candy', edge: 'choco' }] },
   };
+
+  // Nach jedem Boss geht es durch einen anderen Durchgang in eine neue Welt (danach von vorn)
+  const PASSAGES = [
+    { name: 'Sternenleere', to: 'water', sky: ['#05020c', '#140a24', '#25163b'], streak: '210,180,255', walls: ['violet', 'obsidian'],
+      ring: '80,220,255', inner: '#0a2a4a', fill: '40,170,230', sparks: ['200,245,255', '120,255,220'], hole: ['#1c0b33', '170,110,255', '240,220,255'], flash: '120,60,220', arrive: '60,200,255' },
+    { name: 'Eisrutsche', to: 'ice', sky: ['#0b2a44', '#1f5f8a', '#7fc6ee'], streak: '235,250,255', walls: ['packedIce', 'ice'],
+      ring: '220,250,255', inner: '#1f5f8a', fill: '170,230,255', sparks: ['255,255,255', '190,240,255'], hole: ['#0b2a44', '180,230,255', '255,255,255'], flash: '170,230,255', arrive: '220,245,255' },
+    { name: 'Sandstrudel', to: 'desert', sky: ['#3a1e08', '#7a4a18', '#c88a3a'], streak: '255,220,150', walls: ['sandstone', 'sand'],
+      ring: '255,200,90', inner: '#5a3510', fill: '230,170,80', sparks: ['255,240,190', '255,190,90'], hole: ['#3a1e08', '255,200,110', '255,240,200'], flash: '255,190,90', arrive: '255,220,150' },
+    { name: 'Sporenschacht', to: 'shroom', sky: ['#0d0618', '#24113a', '#3d1d55'], streak: '120,255,220', walls: ['mycel', 'stem'],
+      ring: '255,90,200', inner: '#2a0f3a', fill: '200,80,220', sparks: ['120,255,220', '255,160,240'], hole: ['#14081f', '120,255,220', '255,160,240'], flash: '200,90,255', arrive: '120,255,220' },
+    { name: 'Regenbogentunnel', to: 'sky', sky: ['#2a1a5a', '#5a4ab0', '#b0a0ff'], streak: 'rainbow', walls: ['cloud', 'paleStone'],
+      ring: '255,255,255', inner: '#6a5ad0', fill: '255,220,250', sparks: ['255,120,120', '120,200,255'], hole: ['#2a1a5a', '255,255,255', '255,230,120'], flash: '255,240,255', arrive: '255,255,255' },
+    { name: 'Neonröhre', to: 'neon', sky: ['#020008', '#0a0220', '#180640'], streak: '60,240,255', walls: ['neon', 'neonEdge'],
+      ring: '255,60,220', inner: '#120828', fill: '60,240,255', sparks: ['255,60,220', '60,240,255'], hole: ['#020008', '60,240,255', '255,60,220'], flash: '60,240,255', arrive: '255,60,220' },
+    { name: 'Zuckerschlund', to: 'candy', sky: ['#5a1a3a', '#a03a70', '#ff8ac8'], streak: '255,230,245', walls: ['candy', 'choco'],
+      ring: '255,255,255', inner: '#a03a70', fill: '255,150,210', sparks: ['255,255,255', '140,230,255'], hole: ['#4a1030', '255,150,210', '255,255,255'], flash: '255,150,210', arrive: '255,190,230' },
+  ];
+  const RAINBOW = ['255,90,90', '255,170,60', '255,240,90', '110,230,110', '90,170,255', '190,120,255'];
+  // bossLevel zählt die Bosse in diesem Spiel: gerade = Viktor, ungerade = Daniel
+  const passage = () => PASSAGES[bossLevel % PASSAGES.length];
+  const bossKind = () => (bossLevel % 2 === 0 ? 'viktor' : 'daniel');
+  const bossName = (k) => (k === 'daniel' ? 'Daniel' : 'Viktor');
+  const bossStageNo = (k) => (k === 'daniel' ? danielLook : bossLook) + 1;
 
   // Hintergrund-Partikel (Wolken / Glut / Sterne)
   const clouds = Array.from({ length: 5 }, (_, i) => ({
@@ -646,12 +714,13 @@
     cameo = null;
     cameoT = 10 + Math.random() * 10;
     popups = [];
-    bossLevel = 0;
+    bossLevel = START_CYCLE;
     nextBossAt = (Math.floor(score / BOSS_EVERY) + 1) * BOSS_EVERY;
     pollenT = 0;
     warnT = 0;
-    world = 'over';
-    spawnWorld = 'over';
+    // im Testmodus mit level=… in der Welt starten, in der man nach dem vorigen Boss ankommt
+    world = START_CYCLE > 0 ? PASSAGES[(START_CYCLE - 1) % PASSAGES.length].to : 'over';
+    spawnWorld = world;
     setTrack('calm');
   }
   reset();
@@ -667,7 +736,7 @@
     const pending = cols.filter((c) => !c.passed).length;
     const pointNo = score + pending + 1;
     if (pointNo >= nextBossAt) {
-      const target = 'fire'; // der Boss wartet in der Feuerwelt
+      const target = bossKind() === 'daniel' ? 'swamp' : 'fire'; // Viktor wartet in der Feuerwelt, Daniel im Capybara-Sumpf
       cols.push({ x, gapY: randomGapY(), passed: false, portal: true, toBoss: true, target, entered: false });
       spawnWorld = target;
       mode = 'toPortal';
@@ -709,7 +778,7 @@
     c.entered = true;
     world = c.target;
     flash = 1;
-    flashColor = '170,80,255';
+    flashColor = c.target === 'swamp' ? '110,190,70' : '170,80,255';
     sfx.portal();
     popups.push({ text: WORLDS[world].name, x: W / 2, y: 300, t: 0, size: 34 });
     if (c.toBoss) {
@@ -724,7 +793,7 @@
         boss.leaving = 0.001;
         boss.sayT = 3.2;
         boss.scream = false;
-        boss.say = pickFarewell();
+        boss.say = pickFarewell(boss.kind);
       }
     }
   }
@@ -748,6 +817,7 @@
   //  4. Danach fällst du durch die Leere und kommst durch ein neues Portal in die Wasserwelt.
   function startBoss() {
     boss = {
+      kind: bossKind(),
       x: W + 90, y: (H - GROUND_H) / 2, homeX: W - 75, t: 0, hurt: 0,
       phase: 'lasers', face: -1, headGrow: 0, mindK: 0,
       spawnT: 1.4, spawned: 0, total: 6 + bossLevel * 2,
@@ -759,8 +829,9 @@
 
   const CHASE_LINES = ['Ich krieg dich!', 'Bleib stehen!', 'Gleich hab ich dich!', 'Hihihi!', 'Du entkommst mir nicht!'];
 
-  // Durchs Blockloch gefallen: Sturz durch die Leere
+  // Durchs Blockloch gefallen: Sturz durch den Durchgang (jedes Mal ein anderer)
   function enterVoid() {
+    const kind = boss ? boss.kind : bossKind();
     world = 'void';
     mode = 'void';
     voidT = 0;
@@ -772,27 +843,29 @@
     bee.y = 30;
     bee.vy = 150;
     flash = 1;
-    flashColor = '120,60,220';
+    flashColor = passage().flash;
     sfx.portal();
-    popups.push({ text: WORLDS.void.name, x: W / 2, y: 300, t: 0, size: 34 });
-    popups.push({ text: 'Viktor: „Neiiin!“', x: W / 2, y: 350, t: 0, size: 20 });
+    popups.push({ text: passage().name, x: W / 2, y: 300, t: 0, size: 34 });
+    popups.push({ text: `${bossName(kind)}: „Neiiin!“`, x: W / 2, y: 350, t: 0, size: 20 });
   }
 
-  // Durch das neue Portal: Ankunft in der Wasserwelt
+  // Durch das Portal am Ende des Durchgangs: Ankunft in einer neuen Welt
   function enterWater() {
-    world = 'water';
-    spawnWorld = 'water';
+    const p = passage(), kind = bossKind();
+    world = p.to;
+    spawnWorld = p.to;
     mode = 'cols';
     voidPortal = null;
     bossLevel++;
-    bossLook++;   // Viktor wird beim nächsten Mal noch verrückter – bleibt auch nach Neustart
-    saveLook();
+    if (kind === 'daniel') { danielLook++; saveDanielLook(); }   // Daniel wird beim nächsten Mal noch stärker
+    else { bossLook++; saveLook(); }                            // Viktor wird beim nächsten Mal noch verrückter
     nextBossAt = (Math.floor(score / BOSS_EVERY) + 1) * BOSS_EVERY;
     flash = 1;
-    flashColor = '60,200,255';
+    flashColor = p.arrive;
     sfx.portal();
     setTrack('calm');
-    popups.push({ text: WORLDS.water.name, x: W / 2, y: 300, t: 0, size: 34 });
+    popups.push({ text: WORLDS[world].name, x: W / 2, y: 300, t: 0, size: 34 });
+    popups.push({ text: `Nächster Boss: ${bossName(bossKind())}`, x: W / 2, y: 345, t: 0, size: 18 });
     spawnNext(W + 160);
   }
 
@@ -833,7 +906,8 @@
     }
   }
 
-  const bossGroundY = () => H - GROUND_H - (58 * (1 + Math.min(bossLook, 10) * 0.06) + 19);
+  // Höhe, in der der Boss am Boden läuft (Daniels Capybara hat die Füße 22 px unter seinem Mittelpunkt)
+  const bossGroundY = () => (boss && boss.kind === 'daniel') ? H - GROUND_H - 22 : H - GROUND_H - (58 * (1 + Math.min(bossLook, 10) * 0.06) + 19);
 
   function spawnLaser() {
     const top = 28, bottom = H - GROUND_H - 28;
@@ -846,7 +920,8 @@
     len = Math.min(len, 170);
     const halfH = Math.abs(Math.sin(angle)) * len / 2;
     const y = top + halfH + Math.random() * (bottom - top - halfH * 2);
-    lasers.push({ x: boss.x - 70, y, len, angle, charge: 0 });
+    // bei Daniel sind es geworfene Hanteln statt Laser (gleiche Form, anderes Aussehen)
+    lasers.push({ x: boss.x - 70, y, len, angle, charge: 0, style: boss.kind });
     beep(1200, 0.25, 'sawtooth', 0.04, 300);
   }
 
@@ -881,7 +956,7 @@
           } else if (lasers.length === 0) {
             b.phase = 'swap';
             b.vx = 0;
-            b.say = ['Jetzt krieg ich dich!'];
+            b.say = [b.kind === 'daniel' ? 'Capy, hinterher!' : 'Jetzt krieg ich dich!'];
             b.scream = true;
             b.sayT = 1.6;
             sfx.warn();
@@ -907,7 +982,8 @@
       b.y = H - GROUND_H - 24 + Math.sin(time * 14) * 2;
       b.talkT -= dt;
       if (b.talkT <= 0) {
-        b.say = [CHASE_LINES[Math.floor(Math.random() * CHASE_LINES.length)]];
+        const lines = b.kind === 'daniel' ? DANIEL_CHASE : CHASE_LINES;
+        b.say = [lines[Math.floor(Math.random() * lines.length)]];
         b.scream = true;
         b.sayT = 1.5;
         b.talkT = 2.8;
@@ -1032,24 +1108,26 @@
       }
     }
 
-    // Ab und zu fliegt Viktor auf seinem Joyor-Roller durch die Oberwelt an dir vorbei
-    if (world === 'over' && mode === 'cols' && !boss) {
+    // Ab und zu düst Viktor auf seinem Joyor-Roller vorbei – oder Daniel galoppiert auf seinem Capybara durchs Bild
+    if (world !== 'void' && world !== 'fire' && world !== 'swamp' && mode === 'cols' && !boss) {
       if (!cameo) {
         cameoT -= dt;
         if (cameoT <= 0) {
-          cameo = { x: -150, y: 150 + Math.random() * 110, baseY: 0, vx: 210, t: 0, phase: 'ride', face: 1,
+          const kind = world === 'over' || Math.random() < 0.5 ? 'viktor' : 'daniel';
+          cameo = { kind, x: -150, y: 150 + Math.random() * 110, baseY: 0, vx: kind === 'daniel' ? 190 : 210, t: 0, phase: 'ride', face: 1,
             leaving: 0, headGrow: 0, mindK: 0, say: null, sayT: 0, scream: false };
+          if (kind === 'daniel') cameo.y = H - GROUND_H - 22;
           cameo.baseY = cameo.y;
-          beep(140, 0.8, 'sawtooth', 0.04, 420);
+          beep(kind === 'daniel' ? 90 : 140, 0.8, 'sawtooth', 0.04, kind === 'daniel' ? 200 : 420);
         }
       }
     }
     if (cameo) {
       cameo.t += dt;
       cameo.x += cameo.vx * dt;
-      cameo.y = cameo.baseY + Math.sin(cameo.t * 3) * 10;
+      cameo.y = cameo.baseY + (cameo.kind === 'daniel' ? 0 : Math.sin(cameo.t * 3) * 10);
       cameo.sayT = Math.max(0, cameo.sayT - dt);
-      if (!cameo.said && cameo.x > 30) { cameo.said = true; cameo.say = ['Joyor Preis-Leistung!']; cameo.sayT = 2.6; }
+      if (!cameo.said && cameo.x > 30) { cameo.said = true; cameo.say = [cameo.kind === 'daniel' ? 'Capybara-Power!' : 'Joyor Preis-Leistung!']; cameo.sayT = 2.6; }
       if (cameo.x > W + 220) { cameo = null; cameoT = 25 + Math.random() * 25; }
     }
 
@@ -1168,12 +1246,108 @@
       }
       drawBlockHills(H - GROUND_H - 40, 60, 0.6, '#0d4a68', hillX * 0.5);
       drawBlockHills(H - GROUND_H - 8, 40, 1.1, '#156b86', hillX);
+    } else if (world === 'swamp') {
+      // Capybara-Sumpf: trüber grüner Nebel, Schilf und Glühwürmchen
+      skyGradient(['#1d2a14', '#3a4a22', '#6a7a3a']);
+      drawBlockHills(H - GROUND_H - 60, 60, 0.6, '#24331a', hillX * 0.4);
+      ctx.fillStyle = '#2f4a1c';
+      for (let k = 0; k < 18; k++) {
+        const rx = ((k * 53 - hillX * 0.8) % (W + 40) + W + 40) % (W + 40) - 20;
+        const rh = 30 + (k * 17) % 40;
+        ctx.fillRect(Math.round(rx), H - GROUND_H - rh, 3, rh);
+        ctx.fillStyle = '#6b4a2a'; ctx.fillRect(Math.round(rx) - 1, H - GROUND_H - rh - 8, 5, 10); ctx.fillStyle = '#2f4a1c';
+      }
+      for (const m of motes) {
+        const a = 0.3 + Math.sin(m.p * 3) * 0.3;
+        ctx.fillStyle = `rgba(220,255,120,${Math.max(0, a)})`;
+        ctx.fillRect(Math.round((m.x + Math.sin(m.p) * 10 + W) % W), Math.round(H - GROUND_H - 40 - m.y * 0.4), 3, 3);
+      }
+      ctx.fillStyle = 'rgba(160,190,120,0.18)';
+      ctx.fillRect(0, H - GROUND_H - 70, W, 70);
+    } else if (world === 'ice') {
+      skyGradient(['#8fd3ff', '#c8ecff', '#f2fbff']);
+      drawBlockHills(H - GROUND_H - 60, 80, 0.5, '#d8f0ff', hillX * 0.3);
+      drawBlockHills(H - GROUND_H - 15, 40, 1.0, '#ffffff', hillX);
+      for (const m of motes) {
+        const sy = (((m.y + time * 40 * m.s) % H) + H) % H;
+        const sx = ((m.x - hillX * 0.1 + Math.sin(m.p + time) * 6) % W + W) % W;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(Math.round(sx), Math.round(sy), 3, 3);
+      }
+    } else if (world === 'desert') {
+      skyGradient(['#ffb36b', '#ffd59a', '#fff0c8']);
+      ctx.fillStyle = 'rgba(255,250,200,0.9)';
+      ctx.beginPath(); ctx.arc(310, 100, 36, 0, Math.PI * 2); ctx.fill();
+      drawBlockHills(H - GROUND_H - 50, 70, 0.4, '#e6b870', hillX * 0.3);
+      drawBlockHills(H - GROUND_H - 12, 40, 0.8, '#f0cd8a', hillX);
+      ctx.fillStyle = '#3f8f3a';
+      for (let k = 0; k < 4; k++) {
+        const cx = ((k * 130 - hillX * 0.9) % (W + 80) + W + 80) % (W + 80) - 40;
+        ctx.fillRect(Math.round(cx), H - GROUND_H - 50, 10, 50);
+        ctx.fillRect(Math.round(cx) - 10, H - GROUND_H - 36, 10, 6); ctx.fillRect(Math.round(cx) - 10, H - GROUND_H - 46, 5, 12);
+        ctx.fillRect(Math.round(cx) + 10, H - GROUND_H - 30, 10, 6); ctx.fillRect(Math.round(cx) + 15, H - GROUND_H - 42, 5, 14);
+      }
+    } else if (world === 'shroom') {
+      skyGradient(['#1a0f2e', '#3a1f4f', '#5a2f6a']);
+      for (let k = 0; k < 5; k++) {
+        const mx = ((k * 110 - hillX * 0.35) % (W + 120) + W + 120) % (W + 120) - 60, mh = 120 + (k * 37) % 90;
+        ctx.fillStyle = '#3a2a4a'; ctx.fillRect(Math.round(mx), H - GROUND_H - mh, 14, mh);
+        ctx.fillStyle = k % 2 ? '#7a2a5a' : '#2a5a6a';
+        ctx.beginPath(); ctx.ellipse(Math.round(mx) + 7, H - GROUND_H - mh, 48, 22, 0, Math.PI, 0); ctx.fill();
+      }
+      for (const m of motes) {
+        const a = 0.35 + Math.sin(m.p * 2) * 0.35;
+        const sy = (((m.y - time * 12 * m.s) % H) + H) % H;
+        ctx.fillStyle = m.s > 1 ? `rgba(120,255,220,${Math.max(0, a)})` : `rgba(255,150,240,${Math.max(0, a)})`;
+        ctx.fillRect(Math.round(m.x), Math.round(sy), 3, 3);
+      }
+    } else if (world === 'sky') {
+      skyGradient(['#7fc7ff', '#b8e2ff', '#fff4fb']);
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      for (const c of clouds) {
+        const s = 16 * c.s, x = Math.round(c.x), y = Math.round(c.y + 120);
+        ctx.fillRect(x, y, s * 7, s * 2); ctx.fillRect(x + s * 2, y - s, s * 3, s);
+      }
+      // Regenbogen in der Ferne
+      RAINBOW.forEach((col, i) => {
+        ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(W / 2, H - GROUND_H + 40, 240 - i * 6, Math.PI, 0); ctx.stroke();
+      });
+    } else if (world === 'neon') {
+      skyGradient(['#05010f', '#12052a', '#2a0a4a']);
+      for (let k = 0; k < 9; k++) {
+        const bx = ((k * 60 - hillX * 0.5) % (W + 60) + W + 60) % (W + 60) - 30, bh = 90 + (k * 47) % 140;
+        ctx.fillStyle = '#0d0620'; ctx.fillRect(Math.round(bx), H - GROUND_H - bh, 44, bh);
+        for (let wy = H - GROUND_H - bh + 8; wy < H - GROUND_H - 6; wy += 12) for (let wx = 5; wx < 40; wx += 10) {
+          if ((k + wx + wy) % 3 === 0) { ctx.fillStyle = (wx + wy) % 2 ? 'rgba(60,240,255,0.8)' : 'rgba(255,60,220,0.8)'; ctx.fillRect(Math.round(bx) + wx, wy, 4, 5); }
+        }
+      }
+      ctx.strokeStyle = 'rgba(255,60,220,0.5)'; ctx.lineWidth = 1;
+      for (let k = 0; k < 8; k++) { const gy = H - GROUND_H - 4 - k * 3; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+    } else if (world === 'candy') {
+      skyGradient(['#ff9ad5', '#ffc8e8', '#fff0f8']);
+      for (let k = 0; k < 5; k++) {
+        const lx = ((k * 100 - hillX * 0.5) % (W + 80) + W + 80) % (W + 80) - 40, lh = 80 + (k * 29) % 60;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(lx), H - GROUND_H - lh, 4, lh);
+        ctx.fillStyle = ['#ff5aa8', '#5ad0ff', '#ffd23f', '#7cff8a', '#c58bff'][k];
+        ctx.beginPath(); ctx.arc(Math.round(lx) + 2, H - GROUND_H - lh, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(Math.round(lx) + 2, H - GROUND_H - lh, 12, 0, Math.PI * 1.5); ctx.stroke();
+      }
+      for (const m of motes) {
+        ctx.fillStyle = ['#ff5aa8', '#5ad0ff', '#ffd23f', '#7cff8a'][Math.floor(m.p) % 4];
+        const sy = (((m.y + time * 20 * m.s) % H) + H) % H;
+        ctx.fillRect(Math.round(m.x), Math.round(sy), 4, 2);
+      }
     } else {
-      skyGradient(['#05020c', '#140a24', '#25163b']);
+      // Durchgang (Sturz) bzw. Sternenleere – Farben je nach Durchgang
+      const ps = passage();
+      skyGradient(mode === 'void' ? ps.sky : ['#05020c', '#140a24', '#25163b']);
       // Funkelnde Sterne
       for (const m of motes) {
         const a = 0.4 + Math.sin(m.p * 2 * m.s) * 0.4;
-        ctx.fillStyle = `rgba(240,230,255,${Math.max(0, a)})`;
+        const col = mode !== 'void' ? '240,230,255' : ps.streak === 'rainbow' ? RAINBOW[Math.floor(m.p * 3) % RAINBOW.length] : ps.streak;
+        ctx.fillStyle = `rgba(${col},${Math.max(0, a)})`;
         const sx = ((m.x - hillX * 0.05 * m.s) % W + W) % W;
         ctx.fillRect(Math.round(sx), Math.round(m.y * 0.7), 2, 2);
       }
@@ -1216,29 +1390,32 @@
     ctx.strokeRect(x, -5, COL_W, top + 5);
     ctx.strokeRect(x, bot, COL_W, H - GROUND_H - bot);
 
-    if (c.portal) drawPortal(x, top, bot);
+    if (c.portal) drawPortal(x, top, bot, c.target);
   }
 
-  function drawPortal(x, top, bot) {
+  // Portal zum Boss: lila (Viktor, Feuerwelt) oder sumpfgrün (Daniel, Capybara-Sumpf)
+  function drawPortal(x, top, bot, target) {
     const h = bot - top;
+    const swamp = target === 'swamp';
+    const base = swamp ? '70,150,50' : '130,50,220', s1 = swamp ? '200,255,140' : '230,190,255', s2 = swamp ? '120,200,80' : '180,110,255', glow = swamp ? '150,230,100' : '200,140,255';
     // Rahmen-Pfosten (nur Optik)
-    ctx.fillStyle = '#140a1f';
+    ctx.fillStyle = swamp ? '#1d2a14' : '#140a1f';
     ctx.fillRect(x, top, 8, h);
     ctx.fillRect(x + COL_W - 8, top, 8, h);
 
     // Wirbelnde Portalfläche
     const px = x + 8, pw = COL_W - 16;
-    ctx.fillStyle = `rgba(130,50,220,${0.7 + Math.sin(time * 3) * 0.1})`;
+    ctx.fillStyle = `rgba(${base},${0.7 + Math.sin(time * 3) * 0.1})`;
     ctx.fillRect(px, top, pw, h);
     for (let k = 0; k < 28; k++) {
       const dir = k % 2 ? 1 : -1;
       const sx = px + (((k * 37 + time * 15 * (k % 3 + 1)) % pw) + pw) % pw;
       const sy = top + (((k * 53 + dir * time * 45 * (1 + (k % 4) * 0.3)) % h) + h) % h;
-      ctx.fillStyle = k % 3 === 0 ? 'rgba(230,190,255,0.8)' : 'rgba(180,110,255,0.7)';
+      ctx.fillStyle = k % 3 === 0 ? `rgba(${s1},0.8)` : `rgba(${s2},0.7)`;
       ctx.fillRect(Math.round(sx), Math.round(sy), 4, 4);
     }
     // Leuchten
-    ctx.fillStyle = `rgba(200,140,255,${0.15 + Math.sin(time * 5) * 0.08})`;
+    ctx.fillStyle = `rgba(${glow},${0.15 + Math.sin(time * 5) * 0.08})`;
     ctx.fillRect(x - 6, top - 6, COL_W + 12, h + 12);
   }
 
@@ -1264,16 +1441,17 @@
   // Blockloch im Boden: führt hinunter in die Leere
   function drawHole(y) {
     const x = Math.round(hole.x), w = hole.w;
+    const ph = passage().hole;   // Farben des Durchgangs, in den man gleich fällt
     const g = ctx.createLinearGradient(0, y, 0, H);
-    g.addColorStop(0, '#1c0b33');
+    g.addColorStop(0, ph[0]);
     g.addColorStop(1, '#000000');
     ctx.fillStyle = g;
     ctx.fillRect(x, y, w, GROUND_H);
-    // lila Funkeln, das nach unten in die Tiefe fällt
+    // Funkeln, das nach unten in die Tiefe fällt
     for (let k = 0; k < 12; k++) {
       const sx = x + 8 + ((k * 29) % (w - 16));
       const sy = y + (((k * 41 + time * 70 * (1 + (k % 3) * 0.4)) % GROUND_H) + GROUND_H) % GROUND_H;
-      ctx.fillStyle = k % 3 ? 'rgba(170,110,255,0.7)' : 'rgba(240,220,255,0.9)';
+      ctx.fillStyle = k % 3 ? `rgba(${ph[1]},0.7)` : `rgba(${ph[2]},0.9)`;
       ctx.fillRect(sx, Math.round(sy), 3, 3);
     }
     // Blockkanten links und rechts
@@ -1300,48 +1478,58 @@
     }
   }
 
-  // Sturz durch die Leere: ein Schacht aus Blöcken, der an dir vorbei nach oben saust
+  // Sturz durch den Durchgang: ein Schacht, der an dir vorbei nach oben saust (jeder Durchgang sieht anders aus)
   function drawVoidFall() {
+    const ps = passage();
     const dist = voidT * 340;
     const off = dist % B;
     const row0 = Math.floor(dist / B);
-    // Sternen-Streifen
+    // Streifen (beim Regenbogentunnel bunt)
     for (const m of motes) {
       const yy = (((m.y - voidT * 420 * m.s) % H) + H) % H;
-      ctx.fillStyle = 'rgba(210,180,255,0.55)';
+      const col = ps.streak === 'rainbow' ? RAINBOW[Math.floor(m.x / 20) % RAINBOW.length] : ps.streak;
+      ctx.fillStyle = `rgba(${col},0.55)`;
       ctx.fillRect(Math.round(m.x), Math.round(yy), 2, Math.round(10 + 14 * m.s));
     }
     // Schachtwände
     for (let k = -1; k * B - off < H; k++) {
       const yy = Math.round(k * B - off);
       [0, B, W - 2 * B, W - B].forEach((wx, col) => {
-        const tex = (row0 + k + col) % 4 === 0 ? TEX.violet : TEX.obsidian;
+        const tex = (row0 + k + col) % 4 === 0 ? TEX[ps.walls[0]] : TEX[ps.walls[1]];
         ctx.drawImage(tex, wx, yy, B, B);
       });
     }
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(B * 2 - 6, 0, 6, H);
     ctx.fillRect(W - B * 2, 0, 6, H);
-    // Portal in die Wasserwelt kommt von unten
+    // Regenbogentunnel: bunte Ringe rauschen vorbei
+    if (ps.streak === 'rainbow') {
+      for (let k = 0; k < 6; k++) {
+        const ry = (((k * 110 - voidT * 500) % (H + 60)) + H + 60) % (H + 60) - 30;
+        ctx.strokeStyle = `rgba(${RAINBOW[k]},0.55)`; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.ellipse(W / 2, ry, 150, 18, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    // Portal in die neue Welt kommt von unten
     if (voidPortal) {
       const py = voidPortal.y, cx = W / 2;
       ctx.save();
-      ctx.fillStyle = `rgba(80,220,255,${0.18 + Math.sin(time * 5) * 0.06})`;
+      ctx.fillStyle = `rgba(${ps.ring},${0.18 + Math.sin(time * 5) * 0.06})`;
       ctx.beginPath();
       ctx.ellipse(cx, py, 140, 46, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#0a2a4a';
+      ctx.fillStyle = ps.inner;
       ctx.beginPath();
       ctx.ellipse(cx, py, 124, 36, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(40,170,230,0.85)';
+      ctx.fillStyle = `rgba(${ps.fill},0.85)`;
       ctx.beginPath();
       ctx.ellipse(cx, py, 112, 28, 0, 0, Math.PI * 2);
       ctx.fill();
       for (let k = 0; k < 24; k++) {
         const a = k * 0.9 + time * (k % 2 ? 2 : -2.6);
         const r = 0.25 + (k % 5) * 0.17;
-        ctx.fillStyle = k % 3 ? 'rgba(200,245,255,0.85)' : 'rgba(120,255,220,0.8)';
+        ctx.fillStyle = `rgba(${k % 3 ? ps.sparks[0] : ps.sparks[1]},0.85)`;
         ctx.fillRect(Math.round(cx + Math.cos(a) * 108 * r), Math.round(py + Math.sin(a) * 26 * r), 4, 4);
       }
       ctx.restore();
@@ -1597,16 +1785,18 @@
     ctx.restore();
   }
 
-  // Viktor – dürres, langgezogenes Gruselwesen mit einem Kopf.
-  // Mit jedem Boss wird er länger, sein Geweih wächst und er wird verrückter.
+  // Viktor – dürres, langes Wesen wie in „Viktors Nachtschicht“: heller Langkopf mit schwarzen Augenhöhlen,
+  // Zylinder, Namensschild und viel zu lange Arme mit langen Fingern.
+  // Mit jedem Boss wird sein Hals länger und er wird verrückter.
   function drawBoss(b = boss) {
+    if (b.kind === 'daniel') { drawDaniel(b); return; }
     const crawling = b.phase === 'chase';
     const st = bossStage();
     const c = crazy();
     const g = Math.min(bossLook, 10);
     const e = 1 + g * 0.06;            // wird mit jeder Stufe länger
-    const SKIN = '#b9b2a5', DARK = '#2a2622', BONE = '#ddd5c4';
-    const eyeColor = st.aura ? `rgb(${st.aura})` : '#ff3030';
+    const SKIN = '#8a867d', DARK = '#2b2925', FACE = '#d8d1c1';
+    const eyeColor = st.aura ? `rgb(${st.aura})` : '#fffae6';
     const running = b.phase === 'run' || b.leaving > 0;
     const runT = time * (12 + c * 2);
     const sway = running ? 0 : Math.sin(time * 2.2) * 3;
@@ -1629,7 +1819,6 @@
       ctx.arc(0, -5, 80 * pulse, 0, Math.PI * 2);
       ctx.fill();
     }
-
     // Blitze (ab Stufe 3)
     if (st.bolts && Math.random() < 0.5) {
       ctx.strokeStyle = 'rgba(230,245,255,0.9)';
@@ -1638,19 +1827,14 @@
         let x = (Math.random() - 0.5) * 70, y = -60 + Math.random() * 40;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        for (let j = 0; j < 4; j++) {
-          x += (Math.random() - 0.5) * 18;
-          y += 10 + Math.random() * 8;
-          ctx.lineTo(x, y);
-        }
+        for (let j = 0; j < 4; j++) { x += (Math.random() - 0.5) * 18; y += 10 + Math.random() * 8; ctx.lineTo(x, y); }
         ctx.stroke();
       }
     }
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    // Dünne Gliedmaßen: dunkle Kontur + helle Füllung
+    // Dünne Gliedmaßen: dunkle Kontur + Füllung
     const limb = (pts, w, fill = SKIN) => {
       for (const [color, lw] of [[DARK, w + 3], [fill, w]]) {
         ctx.strokeStyle = color;
@@ -1661,157 +1845,113 @@
         ctx.stroke();
       }
     };
-    // Lange Krallen (dir = Richtung, 0 = nach unten)
-    const claws = (x, y, dir) => {
+    // Vier lange, dünne Finger (dir = Richtung, 0 = nach unten)
+    const fingers = (x, y, dir) => {
       ctx.strokeStyle = DARK;
       ctx.lineWidth = 2;
-      for (const a of [-0.45, 0, 0.45]) {
+      for (const a of [-0.32, -0.11, 0.11, 0.32]) {
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.sin(a + dir) * 11, y + Math.cos(a + dir) * 11);
+        ctx.lineTo(x + Math.sin(a + dir) * 15, y + Math.cos(a + dir) * 15);
         ctx.stroke();
       }
     };
+    // Namensschild auf der Brust
+    const badge = (x, y) => {
+      ctx.fillStyle = '#d9d3c3'; ctx.fillRect(x - 9, y - 3.5, 18, 7);
+      ctx.fillStyle = '#7b2a24'; ctx.fillRect(x - 9, y - 3.5, 18, 2);
+      ctx.fillStyle = '#111'; ctx.font = 'bold 4px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('VIKTOR', x, y + 1);
+    };
 
-    const ant = 10 + g * 3;
     const s = 1.3 + c * 0.08 + b.headGrow;
+    const neck = 1 + g * 0.12;   // der Hals wird mit jeder Stufe länger
     let hx, hy, hRot;
 
     if (crawling) {
       // Verfolgung: Viktor krabbelt auf allen Vieren wie eine riesige Spinne (Boden bei y = 22)
       const ct = time * (11 + c);
       const bob = Math.sin(ct * 2) * 2;
-      // Schattenfetzen auf dem Rücken
-      ctx.fillStyle = 'rgba(20,16,14,0.75)';
-      ctx.beginPath();
-      ctx.moveTo(-28 * e, -26 + bob);
-      for (let i = 0; i <= 6; i++) {
-        ctx.lineTo((-24 + i * 9) * e, -32 - (i % 2 ? 0 : 10) + Math.sin(time * 12 + i) * 3 + bob);
-      }
-      ctx.lineTo(34 * e, -14 + bob);
-      ctx.closePath();
-      ctx.fill();
-      // Hinterbeine – abgeknickt nach oben wie bei einer Spinne
+      // Hinterbeine – abgeknickt nach oben
       for (const [k, ph] of [[0, 0], [1, Math.PI]]) {
         const sw = Math.sin(ct + ph);
         const lift = Math.max(0, sw) * 8;
         const fx = (34 + k * 6) * e + sw * 14;
-        limb([[(22 + k * 4) * e, -16 + bob], [(40 + k * 4) * e, -40 + bob], [fx, 22 - lift]], 4);
-        claws(fx, 22 - lift, -1.2);
+        limb([[(22 + k * 4) * e, -16 + bob], [(40 + k * 4) * e, -40 + bob], [fx, 22 - lift]], 3.5);
+        limb([[fx, 22 - lift], [fx - 7, 23 - lift]], 3, DARK);
       }
       // Waagerechter, dürrer Körper mit Rippen
       ctx.beginPath();
-      ctx.ellipse(0, -18 + bob, 32 * e, 11, 0, 0, Math.PI * 2);
-      ctx.fillStyle = SKIN;
-      ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(42,38,34,0.7)';
-      ctx.lineWidth = 1.5;
-      for (let i = 0; i < 5; i++) {
-        const x = (-18 + i * 8) * e;
-        ctx.beginPath();
-        ctx.moveTo(x - 3, -26 + bob);
-        ctx.quadraticCurveTo(x + 3, -18 + bob, x - 3, -10 + bob);
-        ctx.stroke();
-      }
+      ctx.ellipse(0, -18 + bob, 30 * e, 8, 0, 0, Math.PI * 2);
+      ctx.fillStyle = SKIN; ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(43,41,37,0.7)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 5; i++) { const x = (-16 + i * 8) * e; ctx.beginPath(); ctx.moveTo(x, -24 + bob); ctx.lineTo(x, -12 + bob); ctx.stroke(); }
       // Viel zu lange Arme – greifen abwechselnd weit nach vorne
       for (const ph of [0, Math.PI]) {
         const sw = Math.sin(ct + ph + 1);
         const lift = Math.max(0, -sw) * 10;
         const fx = -52 * e - sw * 16;
-        limb([[-24 * e, -22 + bob], [-36 * e - sw * 6, -46 + bob], [fx, 22 - lift]], 3.5);
-        claws(fx, 22 - lift, -1.0);
+        limb([[-24 * e, -22 + bob], [-36 * e - sw * 6, -46 + bob], [fx, 14 - lift]], 3);
+        fingers(fx, 14 - lift, -1.2);
       }
-      // Hals und Kopf vorne, Schnauze nach vorne
-      hx = -40 * e - 8;
-      hy = -34 + bob + Math.sin(ct) * 2;
-      hRot = 1.0;
-      limb([[-28 * e, -24 + bob], [hx + 6, hy + 6]], 3 + s * 1.2);
+      // langer Hals nach vorne, Kopf hoch
+      hx = -40 * e - 8 * neck;
+      hy = -40 + bob + Math.sin(ct) * 2;
+      hRot = 0.35;
+      limb([[-28 * e, -22 + bob], [hx + 4, hy + 12]], 2.5 + s * 0.5, FACE);
     } else {
-    // Zottelige Schattenfetzen hinter dem Körper (flattern beim Rennen)
-    ctx.fillStyle = 'rgba(20,16,14,0.75)';
-    ctx.beginPath();
-    ctx.moveTo(-14, -42 * e);
-    ctx.lineTo(14, -42 * e);
-    for (let i = 0; i <= 6; i++) {
-      const x = 18 - i * 6 + (running ? 10 : 0);
-      const y = (10 + (i % 2 ? 0 : 16)) * e + Math.sin(time * (running ? 14 : 4) + i) * 3;
-      ctx.lineTo(x + sway * 0.5, y);
-    }
-    ctx.closePath();
-    ctx.fill();
+      // Gerade, dünne Beine mit kleinen Schuhen
+      const hipY = 12 * e, footY = 58 * e;
+      const ls = running ? Math.sin(runT) : 0;
+      const upL = Math.max(0, ls) * 10, upR = Math.max(0, -ls) * 10;
+      const fL = [-5 + ls * 18, footY - upL], fR = [5 - ls * 18, footY - upR];
+      limb([[-4, hipY], [-5 + ls * 10, hipY + 23 * e], fL], 3.5);
+      limb([[4, hipY], [5 - ls * 10, hipY + 23 * e], fR], 3.5);
+      limb([fL, [fL[0] - 8, fL[1] + 1]], 3.5, DARK);
+      limb([fR, [fR[0] - 8, fR[1] + 1]], 3.5, DARK);
 
-    // Abgeknickte Tierbeine – beim Rennen schwingen sie wild
-    const hipY = 12 * e, footY = 58 * e;
-    const ls = running ? Math.sin(runT) : 0;
-    const upL = Math.max(0, ls) * 10, upR = Math.max(0, -ls) * 10;
-    limb([[-5, hipY], [-13 + ls * 10, hipY + 20 * e], [-4 + ls * 14, hipY + 34 * e - upL], [-10 + ls * 18, footY - upL]], 4);
-    limb([[5, hipY], [12 - ls * 10, hipY + 22 * e], [6 - ls * 14, hipY + 36 * e - upR], [11 - ls * 18, footY - upR]], 4);
-    claws(-10 + ls * 18, footY - upL, -1.2);
-    claws(11 - ls * 18, footY - upR, -1.2);
-
-    // Dürrer Oberkörper mit Rippen
-    ctx.beginPath();
-    ctx.ellipse(0, -14 * e, 12, 30 * e, running ? -0.15 : 0, 0, Math.PI * 2);
-    ctx.fillStyle = SKIN;
-    ctx.fill();
-    ctx.strokeStyle = DARK;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(42,38,34,0.7)';
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 5; i++) {
-      const y = (-34 + i * 8) * e;
+      // Schmaler Oberkörper: unten dünn, Schultern breiter, mit Rippen
+      const shY = -40 * e;
       ctx.beginPath();
-      ctx.moveTo(-9, y + 3);
-      ctx.quadraticCurveTo(0, y - 3, 9, y + 3);
-      ctx.stroke();
-    }
+      ctx.moveTo(-5, hipY); ctx.lineTo(5, hipY); ctx.lineTo(10, shY); ctx.lineTo(-10, shY); ctx.closePath();
+      ctx.fillStyle = SKIN; ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(43,41,37,0.7)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) { const y = (-2 - i * 7) * e; ctx.beginPath(); ctx.moveTo(-5 - i, y); ctx.lineTo(5 + i, y); ctx.stroke(); }
+      badge(-1, -32 * e);
 
-    // Unnatürlich lange Arme
-    const shY = -38 * e;
-    let elbowL, handL, elbowR, handR;
-    if (running) {
-      // wild rudern
-      const a = Math.sin(runT + Math.PI);
-      elbowL = [-22, -10 * e]; handL = [-26 + a * 18, 20 * e - Math.abs(a) * 30];
-      elbowR = [22, -10 * e]; handR = [22 - a * 18, 20 * e - Math.abs(-a) * 30];
-    } else if (b.phase === 'mind') {
-      // beide Krallen zur Spielfigur ausgestreckt
-      const r = 14 + Math.sin(time * 3) * 4 + c * 2;
-      elbowL = [-28, -40 * e]; handL = [-50 - r, -30 * e];
-      elbowR = [10, -16 * e]; handR = [-36 - r * 0.6, -10 * e];
-    } else if (b.phase === 'ride') {
-      // hält den Lenker des E-Rollers fest
-      elbowL = [-26, -26 * e]; handL = [-38, -14 * e];
-      elbowR = [-8, -14 * e]; handR = [-35, -11 * e];
-    } else {
-      elbowL = [-24, -6 * e]; handL = [-30, 40 * e];
-      elbowR = [22, -4 * e + sway]; handR = [20 + sway, 44 * e];
-    }
-    limb([[-9, shY], elbowL, handL], 3.5);
-    limb([[9, shY], elbowR, handR], 3.5);
-    claws(handL[0], handL[1], b.phase === 'mind' && !running ? -1.4 : 0.3);
-    claws(handR[0], handR[1], b.phase === 'mind' && !running ? -1.4 : 0);
+      // Unnatürlich lange Arme – die Hände hängen bis unter die Knie
+      let elbowL, handL, elbowR, handR;
+      if (running) {
+        const a = Math.sin(runT + Math.PI);
+        elbowL = [-20, -12 * e]; handL = [-26 + a * 18, 26 * e - Math.abs(a) * 30];
+        elbowR = [18, -12 * e]; handR = [22 - a * 18, 26 * e - Math.abs(a) * 30];
+      } else if (b.phase === 'mind') {
+        const r = 14 + Math.sin(time * 3) * 4 + c * 2;
+        elbowL = [-28, -42 * e]; handL = [-52 - r, -32 * e];
+        elbowR = [10, -18 * e]; handR = [-38 - r * 0.6, -12 * e];
+      } else if (b.phase === 'ride') {
+        // hält den Lenker des E-Rollers fest
+        elbowL = [-26, -26 * e]; handL = [-38, -14 * e];
+        elbowR = [-8, -14 * e]; handR = [-35, -11 * e];
+      } else {
+        elbowL = [-17, -8 * e]; handL = [-21, 44 * e];
+        elbowR = [15, -6 * e + sway]; handR = [16 + sway, 48 * e];
+      }
+      limb([[-9, shY + 2], elbowL, handL], 3);
+      limb([[9, shY + 2], elbowR, handR], 3);
+      const reach = b.phase === 'mind' && !running;
+      fingers(handL[0], handL[1], reach ? -1.4 : 0.15);
+      fingers(handR[0], handR[1], reach ? -1.4 : 0);
 
-    // Ein Kopf – wird bei der Gedankenkontrolle größer
-    hx = -10;
-    hy = -58 * e - 8 * s + (running ? -Math.abs(Math.sin(runT)) * 4 : Math.sin(time * 2) * 2);
-    hRot = running ? -0.3 + Math.sin(runT * 0.5) * 0.35 : -0.3;
-    limb([[0, -42 * e], [-4, -56 * e], [hx, hy]], 3 + s * 1.2);
+      // Langer, dünner Hals
+      hx = -6;
+      hy = shY - 26 * neck - 10 * s + (running ? -Math.abs(Math.sin(runT)) * 4 : Math.sin(time * 2) * 2);
+      hRot = running ? -0.2 + Math.sin(runT * 0.5) * 0.3 : -0.15 + Math.sin(time * 0.7) * 0.12;
+      limb([[0, shY], [-3, shY - 12 * neck], [hx, hy + 14 * s]], 2.5 + s * 0.5, FACE);
     }
-
-    // Geweih – wächst mit jeder Stufe
-    const an = ant * s;
-    for (const sd of [-1, 1]) {
-      const ax = hx + sd * 5 * s, ay = hy - 12 * s;
-      limb([[ax, ay], [ax + sd * an * 0.6, ay - an]], 2.5 * s, BONE);
-      limb([[ax + sd * an * 0.25, ay - an * 0.4], [ax + sd * an * 0.75, ay - an * 0.55]], 2 * s, BONE);
-      if (g >= 3) limb([[ax + sd * an * 0.45, ay - an * 0.75], [ax + sd * an * 0.2, ay - an * 1.05]], 2 * s, BONE);
-    }
-    drawSkull(hx, hy, hRot, s);
+    drawVHead(hx, hy, hRot, s);
 
     // Schwindel-Sternchen beim Rennen
     if (running) {
@@ -1819,7 +1959,7 @@
         const a = time * 6 + (i * Math.PI * 2) / (3 + Math.min(c, 4));
         ctx.fillStyle = i % 2 ? '#ffe14d' : '#ffffff';
         ctx.beginPath();
-        ctx.arc(hx + Math.cos(a) * 18 * s, hy - 20 * s + Math.sin(a) * 6 * s, 2.5, 0, Math.PI * 2);
+        ctx.arc(hx + Math.cos(a) * 18 * s, hy - 30 * s + Math.sin(a) * 6 * s, 2.5, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1828,107 +1968,248 @@
     // Kopfposition in Bildschirm-Koordinaten (für Gedanken-Wellen und Namensschild)
     b.headX = b.x + (b.face > 0 ? -hx : hx);
     b.headY = b.y + hy;
+    const nameY = b.headY - 40 * s;
+    text('Viktor', b.headX, nameY, 13 + (s - 1) * 5, '#ffffff', '#2a2622');
+    speech(b, nameY);
 
-    // Name über dem Kopf
-    text('Viktor', b.headX, b.headY - 22 * s - an, 13 + (s - 1) * 5, '#ffffff', '#2a2622');
-
-    // Sprechblase – gerade und immer im Bild
-    if (b.sayT > 0 && b.say) {
-      const size = b.scream ? 22 : 16;
-      ctx.font = `900 ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
-      const lines = b.say;
-      const lh = size + 6;
-      const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
-      const bh = lines.length * lh + 14;
-      const shake = b.scream ? (Math.random() - 0.5) * 5 : 0;
-      const cx = clamp(b.x - 40, bw / 2 + 6, W - bw / 2 - 6) + shake;
-      const cy = clamp(b.headY - 22 * s - an - 40, bh / 2 + 6, H - GROUND_H - bh / 2) + shake;
-      ctx.globalAlpha = Math.min(1, b.sayT * 2);
-      roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 12);
-      ctx.fillStyle = b.scream ? '#fff0f0' : '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx + 10, cy + bh / 2);
-      ctx.lineTo(cx + 30, cy + bh / 2 + 16);
-      ctx.lineTo(cx + 26, cy + bh / 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      lines.forEach((l, i) => {
-        const color = b.scream ? '#e0141e' : i === 0 ? '#2a2622' : '#c0392b';
-        text(l, cx, cy - bh / 2 + 7 + lh * (i + 0.5), i === 0 ? size : 14, color, '#ffffff');
-      });
-      ctx.globalAlpha = 1;
-    }
-
-    // Langer Tierschädel als Kopf
-    function drawSkull(headX, headY, rot, scale) {
+    // Langer, heller Kopf mit Zylinder, schwarzen Augenhöhlen und kleinen weißen Pupillen
+    function drawVHead(x, y, rot, sc) {
       ctx.save();
-      ctx.translate(headX, headY);
+      ctx.translate(x, y);
       ctx.rotate(rot);
-      ctx.scale(scale, scale);
-      ctx.fillStyle = BONE;
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 10, 17, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      // Schnauze
-      ctx.beginPath();
-      ctx.moveTo(-8, 6);
-      ctx.lineTo(-6, 23);
-      ctx.lineTo(2, 25);
-      ctx.lineTo(7, 10);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      // Kiefer mit spitzen Zähnen – beim Rennen weit offen (verrücktes Grinsen)
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      const open = running || crawling ? 3 : 0;
-      ctx.moveTo(-6, 17);
-      ctx.lineTo(4, 18 + open);
-      for (let i = 0; i < 4; i++) {
-        const x = -5 + i * 2.6;
-        ctx.moveTo(x, 17);
-        ctx.lineTo(x + 1, 20 + open);
-      }
-      ctx.stroke();
-      // Augenhöhlen: bei Gedankenkontrolle Spiral-Augen, sonst glühende Punkte
-      ctx.fillStyle = DARK;
-      ctx.beginPath();
-      ctx.ellipse(-4, -3, 3.5, 5, 0, 0, Math.PI * 2);
-      ctx.ellipse(4, -3, 3.5, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.scale(sc, sc);
+      // Zylinder
+      ctx.fillStyle = '#16110f';
+      ctx.fillRect(-11, -20, 22, 3);
+      ctx.fillRect(-7, -34, 14, 15);
+      ctx.fillStyle = '#7b2a24';
+      ctx.fillRect(-7, -23, 14, 2.5);
+      // Langkopf
+      ctx.fillStyle = FACE; ctx.strokeStyle = DARK; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.ellipse(0, 0, 8, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath(); ctx.ellipse(3, 1, 4.5, 16, 0, 0, Math.PI * 2); ctx.fill();
+      // Augenhöhlen
+      ctx.fillStyle = '#050404';
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sd * 3.4, -6, 2.4, 5.2, sd * 0.15, 0, Math.PI * 2); ctx.fill(); }
       if (b.phase === 'mind' && !running) {
+        // Spiral-Augen bei der Gedankenkontrolle
         ctx.strokeStyle = '#d68cff';
-        ctx.lineWidth = 1;
-        for (const ex of [-4, 4]) {
+        ctx.lineWidth = 0.8;
+        for (const ex of [-3.4, 3.4]) {
           ctx.beginPath();
           for (let a = 0; a < Math.PI * 4; a += 0.4) {
-            const r = a * 0.28;
-            const x = ex + Math.cos(a + time * 8) * r, y = -3 + Math.sin(a + time * 8) * r;
-            if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            const r = a * 0.18;
+            const px = ex + Math.cos(a + time * 8) * r, py = -6 + Math.sin(a + time * 8) * r;
+            if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
           }
           ctx.stroke();
         }
       } else {
         ctx.fillStyle = eyeColor;
         ctx.shadowColor = eyeColor;
-        ctx.shadowBlur = 12 + g;
+        ctx.shadowBlur = 6 + g;
         ctx.beginPath();
-        // verrückt: Augen unterschiedlich groß
-        ctx.arc(-4, -2, 1.8 + (running ? c * 0.15 : 0), 0, Math.PI * 2);
-        ctx.arc(4, -2, 1.8, 0, Math.PI * 2);
+        ctx.arc(-3.4, -6.5, 0.9 + (running ? c * 0.12 : 0), 0, Math.PI * 2);
+        ctx.arc(3.4, -6.5, 0.9, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
       }
+      // Mund – beim Rennen und Krabbeln weit offen mit Zähnen
+      const open = running || crawling ? 1 : 0;
+      ctx.fillStyle = '#050404';
+      ctx.beginPath(); ctx.ellipse(0, 9, 1.8 + open * 2.5, 1.4 + open * 3, 0, 0, Math.PI * 2); ctx.fill();
+      if (open) {
+        ctx.fillStyle = '#e9e2cf';
+        for (let k = -2; k <= 2; k++) { ctx.fillRect(k * 1.4 - 0.4, 5.4, 0.8, 1.4); ctx.fillRect(k * 1.4 - 0.4, 11.2, 0.8, 1.4); }
+      }
       ctx.restore();
     }
+  }
+
+  // Daniel – muskulös, kleiner Kopf, rote Augen, „DANIEL“-Gürtel. Reitet auf einem Capybara.
+  // Mit jeder Stufe werden seine Muskeln dicker und seine Wut-Aura größer.
+  function drawDaniel(b) {
+    const lv = Math.min(danielLook, 8);
+    const m = 1 + lv * 0.06;
+    const SK = '#8f766a', SD = '#5c4840', OUT = '#2e221e';
+    const CAPY = '#8b5e3c', CAPYD = '#6a4429', CAPYL = '#a87a52';
+    const galloping = b.phase !== 'lasers' || b.leaving > 0;
+    const gt = time * 13;
+    const bounce = galloping ? -Math.abs(Math.sin(gt)) * 5 : Math.sin(time * 3) * 3;
+
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    if (b.face > 0) ctx.scale(-1, 1);   // Grundhaltung schaut nach links
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Wut-Aura ab Stufe 2
+    if (lv >= 1) {
+      const r = 70 + lv * 5 + Math.sin(time * 8) * 4;
+      const ag = ctx.createRadialGradient(0, -40, 10, 0, -40, r);
+      ag.addColorStop(0, 'rgba(255,70,40,0.35)');
+      ag.addColorStop(1, 'rgba(255,70,40,0)');
+      ctx.fillStyle = ag;
+      ctx.beginPath(); ctx.arc(0, -40, r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // ---------- Capybara (Füße bei y = 22) ----------
+    for (const [lx, ph] of [[-30, 0], [-18, Math.PI], [14, Math.PI * 0.5], [26, Math.PI * 1.5]]) {
+      const sw = galloping ? Math.sin(gt + ph) : 0;
+      const lift = Math.max(0, sw) * 4;
+      ctx.strokeStyle = CAPYD; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(lx, 4 + bounce); ctx.lineTo(lx + sw * 7, 19 - lift); ctx.stroke();
+      ctx.fillStyle = '#2a1a10';
+      ctx.fillRect(lx + sw * 7 - 4, 18 - lift, 8, 4);
+    }
+    ctx.save();
+    ctx.translate(0, bounce);
+    // fassförmiger Körper
+    roundRect(-44, -24, 82, 32, 15);
+    ctx.fillStyle = CAPY; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = CAPYL;
+    roundRect(-36, -4, 66, 9, 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,35,20,0.5)'; ctx.lineWidth = 1.2;
+    for (let k = 0; k < 7; k++) { const x = -30 + k * 9; ctx.beginPath(); ctx.moveTo(x, -19); ctx.lineTo(x + 3, -11); ctx.stroke(); }
+    // großer, eckiger Kopf mit stumpfer Schnauze
+    roundRect(-70, -32, 32, 26, 9);
+    ctx.fillStyle = CAPY; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+    roundRect(-77, -25, 15, 18, 6);
+    ctx.fillStyle = '#5a3a24'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1a0f08';
+    ctx.fillRect(-75, -21, 2, 3); ctx.fillRect(-75, -14, 2, 3);
+    // kleines, gelassenes Auge und Ohr
+    ctx.fillStyle = '#120a06';
+    ctx.beginPath(); ctx.arc(-56, -24, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-57, -25.5, 1, 1);
+    ctx.fillStyle = '#5a3a24';
+    ctx.beginPath(); ctx.ellipse(-45, -33, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+    // Sattel
+    ctx.fillStyle = '#a02020';
+    roundRect(-8, -30, 30, 9, 3); ctx.fill();
+    ctx.fillStyle = '#d8b040'; ctx.fillRect(-8, -24, 30, 2);
+
+    // ---------- Daniel ----------
+    const thick = (pts, w, color) => {
+      for (const [col, lw] of [[OUT, w + 3], [color, w]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      }
+    };
+    // Bein (Oberschenkel in Shorts, kräftige Wade, Schuh)
+    thick([[4, -30], [-12, -26]], 12 * m, '#24252a');
+    thick([[-12, -26], [-14, -8]], 9 * m, SK);
+    ctx.fillStyle = '#161311'; ctx.fillRect(-21, -9, 11, 5);
+    // V-förmiger Oberkörper
+    const sh = 26 * m, wa = 12 * m;
+    ctx.beginPath();
+    ctx.moveTo(-wa, -32); ctx.lineTo(wa, -32); ctx.lineTo(sh, -64); ctx.lineTo(-sh, -64); ctx.closePath();
+    ctx.fillStyle = SK; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+    // Brustmuskeln und Bauchmuskeln
+    ctx.fillStyle = SD;
+    roundRect(-sh * 0.78, -62, sh * 0.74, 11, 4); ctx.fill();
+    roundRect(sh * 0.04, -62, sh * 0.74, 11, 4); ctx.fill();
+    for (let r = 0; r < 3; r++) for (const sd of [-1, 1]) ctx.fillRect(sd > 0 ? 1 : -7, -48 + r * 5, 6, 4);
+    // Gürtel mit Schriftzug
+    ctx.fillStyle = '#121214'; ctx.fillRect(-wa - 1, -36, wa * 2 + 2, 6);
+    ctx.fillStyle = '#d2b46a'; ctx.font = 'bold 5px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('DANIEL', 0, -32.8);
+    // Nacken und runde Schultern
+    ctx.fillStyle = SK;
+    ctx.beginPath(); ctx.moveTo(-sh * 0.55, -64); ctx.lineTo(sh * 0.55, -64); ctx.lineTo(6, -73); ctx.lineTo(-6, -73); ctx.closePath(); ctx.fill();
+    for (const sd of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(sd * sh, -61, 9 * m, 0, Math.PI * 2);
+      ctx.fillStyle = SK; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    }
+    // Arme: im Kampf wirft er Hanteln und spannt den Bizeps, beim Reiten greift er ins Fell
+    let armF, armB;
+    if (!galloping) {
+      const throwA = Math.sin(time * 4) * 6;
+      armF = [[-sh, -61], [-sh - 12, -78 + throwA], [-sh - 4, -95 + throwA]];
+      armB = [[sh, -61], [sh + 13, -54], [sh + 7, -73]];
+    } else {
+      const g2 = Math.sin(gt) * 3;
+      armF = [[-sh, -59], [-sh - 14, -47 + g2], [-sh - 27, -40 + g2]];
+      armB = [[sh, -59], [sh - 2, -44], [-sh * 0.3, -38]];
+    }
+    thick(armB, 8 * m, SK);
+    ctx.fillStyle = SK; ctx.beginPath(); ctx.arc(armB[1][0], armB[1][1] - 2, 6 * m, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = SD; ctx.beginPath(); ctx.arc(armB[2][0], armB[2][1], 5 * m, 0, Math.PI * 2); ctx.fill();
+    thick(armF, 8 * m, SK);
+    ctx.fillStyle = SK; ctx.beginPath(); ctx.arc(armF[1][0], armF[1][1] - 2, 6 * m, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = SD; ctx.beginPath(); ctx.arc(armF[2][0], armF[2][1], 5 * m, 0, Math.PI * 2); ctx.fill();
+    // kleine Hantel in der erhobenen Hand
+    if (!galloping) {
+      const [fx, fy] = armF[2];
+      ctx.strokeStyle = '#9aa0a6'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(fx - 9, fy); ctx.lineTo(fx + 9, fy); ctx.stroke();
+      ctx.fillStyle = '#2a2a2a'; ctx.fillRect(fx - 12, fy - 5, 4, 10); ctx.fillRect(fx + 8, fy - 5, 4, 10);
+    }
+    // kleiner Kopf mit Flat-Top, böser Braue und rot glühenden Augen
+    const hy = -82;
+    roundRect(-7, hy - 10, 14, 17, 3);
+    ctx.fillStyle = SK; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#2e221e'; ctx.fillRect(-7.5, hy - 13, 15, 5);
+    ctx.fillStyle = OUT; ctx.fillRect(-7, hy - 6, 14, 1.6);
+    ctx.fillStyle = '#ff3a20'; ctx.shadowColor = '#ff3a20'; ctx.shadowBlur = 8 + lv;
+    ctx.beginPath(); ctx.arc(-3.5, hy - 3.2, 1.3, 0, Math.PI * 2); ctx.arc(2.5, hy - 3.2, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    const shout = b.sayT > 0 && b.scream;
+    ctx.fillStyle = '#080505'; ctx.fillRect(-3, hy + 2, 6, shout ? 3.5 : 1.2);
+    ctx.restore();
+
+    // Staubwolken hinter dem galoppierenden Capybara
+    if (galloping) {
+      for (let k = 0; k < 3; k++) {
+        ctx.fillStyle = `rgba(150,130,100,${0.4 - k * 0.1})`;
+        ctx.beginPath(); ctx.arc(44 + k * 11 + ((time * 60) % 10), 18 - k * 2, 4 + k * 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    b.headX = b.x;
+    b.headY = b.y - 82 + bounce;
+    text('Daniel', b.headX, b.headY - 24, 14, '#ffffff', '#2e221e');
+    speech(b, b.headY - 24);
+  }
+
+  // Sprechblase über einem Boss – gerade und immer im Bild
+  function speech(b, nameY) {
+    if (!(b.sayT > 0 && b.say)) return;
+    const DARK = '#2a2622';
+    const size = b.scream ? 22 : 16;
+    ctx.font = `900 ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
+    const lines = b.say;
+    const lh = size + 6;
+    const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
+    const bh = lines.length * lh + 14;
+    const shake = b.scream ? (Math.random() - 0.5) * 5 : 0;
+    const cx = clamp(b.x - 40, bw / 2 + 6, W - bw / 2 - 6) + shake;
+    const cy = clamp(nameY - 40, bh / 2 + 6, H - GROUND_H - bh / 2) + shake;
+    ctx.globalAlpha = Math.min(1, b.sayT * 2);
+    roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 12);
+    ctx.fillStyle = b.scream ? '#fff0f0' : '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 10, cy + bh / 2);
+    ctx.lineTo(cx + 30, cy + bh / 2 + 16);
+    ctx.lineTo(cx + 26, cy + bh / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    lines.forEach((l, i) => {
+      const color = b.scream ? '#e0141e' : i === 0 ? '#2a2622' : '#c0392b';
+      text(l, cx, cy - bh / 2 + 7 + lh * (i + 0.5), i === 0 ? size : 14, color, '#ffffff');
+    });
+    ctx.globalAlpha = 1;
   }
 
   // Viktors Gedankenkontrolle: lila Schleier, Psycho-Wellen vom Kopf zur Spielfigur,
@@ -2004,6 +2285,30 @@
     for (const l of lasers) {
       const [ax, ay, bx, by] = laserEnds(l);
       ctx.lineCap = 'round';
+      if (l.style === 'daniel') {
+        // Daniels Langhantel: Stange mit schweren Gewichten an beiden Enden
+        if (l.charge < 1) {
+          ctx.strokeStyle = `rgba(200,200,200,${0.3 + Math.random() * 0.3})`;
+          ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 9;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          ctx.strokeStyle = '#b8bec4'; ctx.lineWidth = 5; ctx.stroke();
+        }
+        for (const [x, y] of [[ax, ay], [bx, by]]) {
+          ctx.save();
+          ctx.translate(x, y); ctx.rotate(l.angle);
+          ctx.globalAlpha = l.charge < 1 ? 0.5 : 1;
+          ctx.fillStyle = '#1f1f22'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+          ctx.fillRect(-7, -15, 14, 30); ctx.strokeRect(-7, -15, 14, 30);
+          ctx.fillStyle = '#3a3a40'; ctx.fillRect(-4, -11, 8, 22);
+          ctx.fillStyle = '#d2b46a'; ctx.fillRect(-2, -3, 4, 6);
+          ctx.restore();
+        }
+        continue;
+      }
       if (l.charge < 1) {
         // Aufladen: dünner, flackernder Strahl
         ctx.strokeStyle = `rgba(${glow},${0.25 + Math.random() * 0.25})`;
@@ -2132,11 +2437,14 @@
 
       if (warnT > 0 && Math.floor(time * 6) % 2 === 0) {
         text('ACHTUNG!', W / 2, 200, 44, '#ff5c5c');
-        text(bossLook === 0 ? 'Viktor naht...' : `Viktor – Stufe ${bossLook + 1}! Noch verrückter!`, W / 2, 245, 20);
+        const k = bossKind();
+        if (k === 'daniel') text(danielLook === 0 ? 'Daniel reitet heran ...' : `Daniel – Stufe ${danielLook + 1}! Noch stärker!`, W / 2, 245, 20);
+        else text(bossLook === 0 ? 'Viktor naht...' : `Viktor – Stufe ${bossLook + 1}! Noch verrückter!`, W / 2, 245, 20);
       }
 
       if (boss) {
-        text(`Viktor · Stufe ${bossLook + 1}`, W / 2, 102, 14, bossStage().hair || '#ffd700');
+        const dan = boss.kind === 'daniel';
+        text(`${bossName(boss.kind)} · Stufe ${bossStageNo(boss.kind)}`, W / 2, 102, 14, dan ? '#ff8a6a' : (bossStage().hair || '#ffd700'));
         if (boss.phase === 'lasers') {
           // Fortschritt: wie viele Laser noch kommen
           const bw = 220, bx = W / 2 - bw / 2, by = 112;
@@ -2147,16 +2455,16 @@
           ctx.fillStyle = '#ff5c5c';
           ctx.fill();
           ctx.globalAlpha = 0.6 + Math.sin(time * 3) * 0.4;
-          text('Weiche den Lasern aus!', W / 2, 160, 17, '#ffcf8a');
+          text(dan ? 'Weiche den Hanteln aus!' : 'Weiche den Lasern aus!', W / 2, 160, 17, '#ffcf8a');
           ctx.globalAlpha = 1;
         } else {
           ctx.globalAlpha = 0.6 + Math.sin(time * 5) * 0.4;
-          text('Viktor verfolgt dich!', W / 2, 140, 20, '#ff8a8a');
+          text(dan ? 'Daniel jagt dich auf seinem Capybara!' : 'Viktor verfolgt dich!', W / 2, 140, dan ? 17 : 20, '#ff8a8a');
           text('Lass dich ins Blockloch fallen!', W / 2, 168, 17, '#ffe14d');
           ctx.globalAlpha = 1;
         }
       }
-      if (mode === 'void') text('Du fällst durch die Leere …', W / 2, 130, 18, '#d9a6ff', '#1c0b33');
+      if (mode === 'void') text(`Du fällst durch: ${passage().name} …`, W / 2, 130, 18, '#ffffff', '#1c0b33');
     } else {
       const t = Math.min(1, overT * 3);
       const py = 150 + (1 - t) * 40;
@@ -2196,7 +2504,7 @@
   function draw() {
     drawBackground();
     for (const c of cols) drawColumn(c);
-    if (cameo) { drawScooter(cameo); drawBoss(cameo); }
+    if (cameo) { if (cameo.kind !== 'daniel') drawScooter(cameo); drawBoss(cameo); }
     if (boss) drawBoss();
     drawLasers();
     drawProjectiles();
@@ -2228,6 +2536,12 @@
       toggleMute();
     }
   });
+
+  // Versteckter Testzugang (nur mit ?debug in der Adresse), um Spielzustände für Tests herzustellen
+  if (new URLSearchParams(location.search).has('debug')) {
+    // eslint-disable-next-line no-eval
+    window.summDebug = (code) => eval(code);
+  }
 
   let last = performance.now();
   function loop(now) {
