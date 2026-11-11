@@ -1,0 +1,34 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #2b2140;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Spielfeld bleibt immer 2:3 und passt sich dem Bildschirm an */
+#game {
+  display: block;
+  height: min(100vh, 150vw);
+  height: min(100dvh, 150vw);
+  aspect-ratio: 2 / 3;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+@media (max-width: 500px) {
+  #game { border-radius: 0; box-shadow: none; }
+}
