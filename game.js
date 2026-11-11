@@ -85,6 +85,16 @@
 
   // Zum Testen: index.html?start=45 startet mit 45 Punkten (Rekord wird dann nicht gespeichert)
   const START_SCORE = Math.max(0, parseInt(new URLSearchParams(location.search).get('start'), 10) || 0);
+
+  // Einmaliger Bonus-Start bei 100 über einen geheimen Link (pro Gerät nur ein einziges Mal).
+  // Der Bonus gilt als verbraucht, sobald man losspielt – danach startet das Spiel hier nie wieder bei 100.
+  const BONUS_KEY = 'summ-bonus-100-used';
+  let bonusStart = 0;
+  if (new URLSearchParams(location.search).get('bonus') === 'KV7-Q2M-100') {
+    try { if (!localStorage.getItem(BONUS_KEY)) bonusStart = 100; } catch (e) {}
+    // geheimen Teil aus der Adresse entfernen
+    try { const u = new URL(location.href); u.searchParams.delete('bonus'); history.replaceState(null, '', u.pathname + u.search); } catch (e) {}
+  }
   // Zum Testen: index.html?start=197&level=1 startet im 2. Boss-Zyklus (Daniel), level=2 im 3. usw.
   const START_CYCLE = Math.max(0, parseInt(new URLSearchParams(location.search).get('level'), 10) || 0);
 
@@ -697,7 +707,7 @@
     mode = 'cols';
     bee = { x: 110, y: H / 2 - 40, vy: 0, r: 15, rot: 0 };
     cols = [];
-    score = START_SCORE;
+    score = START_SCORE || bonusStart;
     groundX = 0;
     hillX = 0;
     overT = 0;
@@ -721,7 +731,7 @@
     pollenT = 0;
     warnT = 0;
     // im Testmodus mit level=… in der Welt starten, in der man nach dem vorigen Boss ankommt
-    world = START_CYCLE > 0 ? PASSAGES[(START_CYCLE - 1) % PASSAGES.length].to : 'over';
+    world = bonusStart ? 'fire' : START_CYCLE > 0 ? PASSAGES[(START_CYCLE - 1) % PASSAGES.length].to : 'over';
     spawnWorld = world;
     setTrack('calm');
   }
@@ -751,7 +761,15 @@
     ensureAudio();
     if (state === 'ready') {
       state = 'playing';
-      spawnNext(W + 40);
+      if (bonusStart) {
+        // Bonus: sofort in den Kampf gegen Viktor (keine Säulen vorher)
+        try { localStorage.setItem(BONUS_KEY, '1'); } catch (e) {}
+        bonusStart = 0;
+        mode = 'bossIntro';
+        warnT = 2.5;
+        flash = 1; flashColor = '170,80,255';
+        sfx.portal(); setTrack('boss'); setTimeout(sfx.warn, 400);
+      } else spawnNext(W + 40);
       bee.vy = FLAP_V;
       sfx.flap();
     } else if (state === 'playing' && mode !== 'fallHole') {
@@ -2450,6 +2468,7 @@
       ctx.globalAlpha = 1;
       if (best > 0) text(`Rekord: ${best}`, W / 2, 420, 18);
       if (START_SCORE > 0) text(`Testmodus: Start bei ${START_SCORE}`, W / 2, 450, 14, '#ffb0b0');
+      if (bonusStart) text('⭐ Einmaliger Bonus: direkt zu Viktor! ⭐', W / 2, 455, 15, '#ffe14d');
     } else if (state === 'playing') {
       text(String(score), W / 2, 70, 56);
 
