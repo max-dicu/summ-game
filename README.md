@@ -30,6 +30,8 @@ Mit jedem Boss wird Viktor verrückter, länger und sein Geweih wächst. Seine S
 
 **Testmodus für spätere Bosse:** `index.html?start=197&level=1` startet kurz vor dem 2. Boss (Daniel), `level=2` vor dem 3. usw.
 
+**Mehrspieler (2–4 Spieler):** Auf dem Startbildschirm „👥 Mehrspieler“ drücken. Einer erstellt einen Raum und bekommt einen 4-stelligen Code, die anderen treten mit dem Code bei. Der Host startet – alle fliegen dieselbe Strecke, der Bildschirm wird geteilt (2 Spieler nebeneinander, 3–4 im 2×2-Raster). Jeder hat **3 Leben**; nach einem Treffer fliegt man kurz unverwundbar weiter. Wer am weitesten kommt, gewinnt. Die Verbindung läuft über einen öffentlichen Nachrichten-Server (MQTT), keine Anmeldung nötig.
+
 Reines HTML + CSS + JavaScript – kein Build, keine Abhängigkeiten.
 
 ## Lokal spielen

@@ -2,7 +2,7 @@
   'use strict';
 
   const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
+  let ctx = canvas.getContext('2d');
 
   // Logische Spielgröße – wird per CSS skaliert
   const W = 400, H = 600, GROUND_H = 90;
@@ -752,7 +752,7 @@
   function randomGapY() {
     const minY = 70 + GAP / 2;
     const maxY = H - GROUND_H - 70 - GAP / 2;
-    return minY + Math.random() * (maxY - minY);
+    return minY + (MP.on && MP.started ? mpRng(MP.colN++) : Math.random()) * (maxY - minY);
   }
 
   // Erzeugt die nächste Säule – oder ein Portal, wenn sie den Boss-Punkt bringen würde
@@ -771,6 +771,7 @@
 
   function flap() {
     ensureAudio();
+    if (MP.on && state !== 'playing' && !MP.kick) return; // im Mehrspieler startet der Countdown, kein Neustart allein
     if (state === 'ready') {
       state = 'playing';
       if (bonusStart) {
@@ -794,6 +795,12 @@
 
   function die() {
     if (state !== 'playing') return;
+    // Mehrspieler: 3 Leben – nach einem Treffer kurz unverwundbar weiterfliegen
+    if (MP.on && MP.started) {
+      if (MP.invT > 0) return;
+      if (MP.lives > 1) { MP.lives--; MP.invT = 2.2; bee.y = H / 2 - 40; bee.vy = FLAP_V * 0.6; flash = 0.7; flashColor = '255,80,80'; sfx.hit(); popups.push({ text: MP.lives === 1 ? '💔 Letztes Leben!' : '💔 Noch ' + MP.lives + ' Leben', x: W / 2, y: 260, t: 0, size: 28 }); return; }
+      MP.lives = 0; MP.out = true;
+    }
     state = 'over';
     flash = 1;
     flashColor = '255,255,255';
@@ -2575,9 +2582,10 @@
         ctx.restore();
       }
     } else drawGround();
-    drawBee();
+    if (!(MP.invT > 0 && Math.floor(time * 10) % 2)) drawBee();
     if (boss && boss.mindK > 0.02 && boss.headX !== undefined) drawMindControl();
     drawUI();
+    drawMpExtras();
 
     if (flash > 0) {
       ctx.fillStyle = `rgba(${flashColor},${Math.min(1, flash) * 0.8})`;
@@ -2608,12 +2616,223 @@
     window.summDebug = (code) => eval(code);
   }
 
+
+  // =====================================================================
+  //  MEHRSPIELER (2–4 Spieler): Raum mit Code, geteilter Bildschirm, 3 Leben – wer am weitesten kommt, gewinnt
+  //  Verbindung über einen öffentlichen Nachrichten-Server (MQTT über WebSocket), keine Anmeldung nötig.
+  // =====================================================================
+  const MP = { on: false, host: false, code: '', id: Math.random().toString(36).slice(2, 10), name: '', players: new Map(), seed: 0,
+    started: false, startAt: 0, lives: 3, invT: 0, out: false, client: null, sendT: 0, colN: 0, finished: false, lobbyT: 0 };
+  const MP_COLORS = ['#ffd23f', '#6fdcff', '#ff8ad8', '#7dff8a'];
+  const MP_BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+  const mpTopic = () => 'summ-mp-k3x9/' + MP.code;
+  let hudName = null, hudLives = null, hudColor = null;
+  function mpRng(n) { let a = (MP.seed + n * 7919) >>> 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  function loadMqtt(cb) {
+    if (window.mqtt) { cb(); return; }
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'; s.onload = cb; s.onerror = () => mpStatus('❌ Keine Internetverbindung zum Server.'); document.head.appendChild(s);
+  }
+  function mpSend(o) { if (MP.client && MP.client.connected) MP.client.publish(mpTopic(), JSON.stringify(Object.assign({ from: MP.id }, o))); }
+  function mpConnect(i, done) {
+    if (i >= MP_BROKERS.length) { mpStatus('❌ Server nicht erreichbar – später nochmal versuchen.'); return; }
+    let c; try { c = window.mqtt.connect(MP_BROKERS[i], { connectTimeout: 7000, reconnectPeriod: 3000, clean: true }); } catch (e) { mpConnect(i + 1, done); return; }
+    let ok = false;
+    const t = setTimeout(() => { if (!ok) { try { c.end(true); } catch (e) {} mpConnect(i + 1, done); } }, 8000);
+    c.on('connect', () => { if (ok) return; ok = true; clearTimeout(t); MP.client = c; c.subscribe(mpTopic(), () => done()); });
+    c.on('message', (tp, buf) => { let m; try { m = JSON.parse(typeof buf === 'string' ? buf : new TextDecoder().decode(buf)); } catch (e) { return; } if (m && m.from !== MP.id) mpHandle(m); });
+  }
+  function mpLeave() {
+    if (MP.client) { mpSend({ t: 'bye' }); const c = MP.client; setTimeout(() => { try { c.end(true); } catch (e) {} }, 200); }
+    MP.client = null; MP.on = false; MP.started = false; MP.players.clear(); MP.finished = false; MP.out = false;
+    layoutMp(); hideResults(); reset();
+  }
+  function lobbyList() { const a = [[MP.id, MP.name]]; for (const [id, p] of MP.players) a.push([id, p.name]); return a; }
+  function mpHandle(m) {
+    const now = performance.now();
+    if (m.t === 'hello') {
+      if (!MP.host) return;
+      if (MP.started) { mpSend({ t: 'busy', to: m.from }); return; }
+      if (MP.players.size >= 3 && !MP.players.has(m.from)) { mpSend({ t: 'full', to: m.from }); return; }
+      MP.players.set(m.from, { name: String(m.name || 'Spieler').slice(0, 14), last: now, st: null });
+      mpSend({ t: 'lobby', list: lobbyList(), host: MP.id }); renderLobby();
+    } else if (m.t === 'lobby') {
+      if (MP.host) return;
+      const ids = new Set(m.list.map((q) => q[0]));
+      for (const id of [...MP.players.keys()]) if (!ids.has(id)) MP.players.delete(id);
+      for (const [id, nm] of m.list) if (id !== MP.id) { const p = MP.players.get(id); if (p) p.name = nm; else MP.players.set(id, { name: nm, last: now, st: null }); }
+      MP.joined = true; renderLobby();
+    } else if ((m.t === 'full' || m.t === 'busy') && m.to === MP.id) {
+      mpStatus(m.t === 'full' ? '❌ Der Raum ist voll (höchstens 4 Spieler).' : '❌ Das Spiel in diesem Raum läuft schon.');
+    } else if (m.t === 'start') {
+      if (MP.host) return;
+      mpBegin(m.seed, m.at - Date.now());
+    } else if (m.t === 'st') {
+      const p = MP.players.get(m.from); if (!p) return;
+      p.st = m; p.last = now; p.recv = now;
+    } else if (m.t === 'bye') {
+      MP.players.delete(m.from); if (MP.host && !MP.started) mpSend({ t: 'lobby', list: lobbyList(), host: MP.id }); renderLobby(); layoutMp();
+    }
+  }
+  // Start: gleiche Strecke für alle, Countdown
+  function mpBegin(seed, delay) {
+    MP.seed = seed; MP.started = true; MP.finished = false; MP.out = false; MP.lives = 3; MP.invT = 0; MP.colN = 0;
+    for (const p of MP.players.values()) p.st = null;
+    hideLobby(); hideResults(); reset(); layoutMp();
+    MP.startAt = performance.now() + Math.max(0, delay);
+  }
+  function mpTick(dt) {
+    if (!MP.on) return;
+    const now = performance.now();
+    if (MP.host && !MP.started && (MP.lobbyT -= dt) <= 0) { MP.lobbyT = 2; if (MP.client) mpSend({ t: 'lobby', list: lobbyList(), host: MP.id }); }
+    for (const [id, p] of MP.players) if (now - p.last > (MP.started ? 8000 : 12000)) { MP.players.delete(id); renderLobby(); layoutMp(); }
+    if (!MP.started) return;
+    if (MP.startAt && now >= MP.startAt && state === 'ready') { MP.startAt = 0; MP.kick = true; flap(); MP.kick = false; }
+    MP.invT = Math.max(0, MP.invT - dt);
+    // eigenen Stand senden (10× pro Sekunde)
+    if ((MP.sendT -= dt) <= 0) {
+      MP.sendT = 0.1;
+      const cs = cols.filter((c) => c.x > -COL_W && c.x < W + 40).map((c) => [Math.round(c.x), Math.round(c.gapY), c.portal ? -1 : Math.max(0, (WORLDS[c.world] && WORLDS[c.world].cols || []).indexOf(c.kind)), c.world || '', c.portal ? (c.target || '') : '']);
+      mpSend({ t: 'st', name: MP.name, y: Math.round(bee.y), rot: +(bee.rot || 0).toFixed(2), score, lives: MP.lives, out: MP.out || state === 'over', world, gx: +groundX.toFixed(1), hx: Math.round(hillX), cols: cs, inv: MP.invT > 0 });
+    }
+    // alle raus? → Ergebnis
+    if (!MP.finished && (state === 'over' || MP.out)) {
+      const others = [...MP.players.values()];
+      if (others.every((p) => p.st && p.st.out)) { MP.finished = true; showResults(); }
+    }
+  }
+  // ---------- andere Spieler mit der normalen Grafik zeichnen ----------
+  function drawGhost(p) {
+    const st = p.st, g = p.ctx; if (!g) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = false;
+    if (!st) { g.fillStyle = '#2b2140'; g.fillRect(0, 0, W, H); const sv = ctx; ctx = g; text(p.name, W / 2, H / 2 - 20, 30, p.color); text('verbindet …', W / 2, H / 2 + 20, 18); ctx = sv; return; }
+    const ex = Math.min(0.3, (performance.now() - p.recv) / 1000) * (st.out ? 0 : SPEED);
+    const S = { state, mode, bee, cols, score, groundX, hillX, overT, flash, boss, stingers, pollen, shots, popups, warnT, world, lasers, hole, voidT, voidPortal, voidChaser, cameo, hudName, hudLives, hudColor };
+    try {
+      ctx = g; state = 'playing'; mode = 'cols'; boss = null; stingers = []; pollen = []; shots = []; popups = []; warnT = 0; lasers = []; hole = null; voidT = 0; voidPortal = null; voidChaser = null; cameo = null; flash = 0;
+      world = WORLDS[st.world] ? st.world : 'over';
+      p.y = p.y === undefined ? st.y : p.y + (st.y - p.y) * 0.35;
+      bee = { x: 110, y: p.y, vy: 0, r: 15, rot: st.rot };
+      cols = st.cols.map((c) => { const w = WORLDS[c[3]] ? c[3] : world; const kinds = (WORLDS[w] && WORLDS[w].cols) || []; return c[2] === -1 ? { x: c[0] - ex, gapY: c[1], passed: true, portal: true, target: WORLDS[c[4]] ? c[4] : 'fire', toBoss: true, entered: false } : { x: c[0] - ex, gapY: c[1], passed: true, world: w, kind: kinds[c[2]] || kinds[0] }; });
+      score = st.score; groundX = st.gx; hillX = st.hx; hudName = p.name; hudLives = st.lives; hudColor = p.color;
+      const blink = st.inv && Math.floor(time * 10) % 2;
+      if (blink) { const ob = bee; bee = { x: -999, y: -999, vy: 0, r: 15, rot: 0 }; draw(); bee = ob; } else draw();
+      if (st.out) { g.fillStyle = 'rgba(20,10,30,0.55)'; g.fillRect(0, 0, W, H); text('RAUS', W / 2, H / 2 - 10, 48, '#ff6a6a'); text(st.score + ' Punkte', W / 2, H / 2 + 36, 22); }
+    } catch (e) { /* ein fehlerhafter Stand soll das Spiel nicht stoppen */ }
+    ({ state, mode, bee, cols, score, groundX, hillX, overT, flash, boss, stingers, pollen, shots, popups, warnT, world, lasers, hole, voidT, voidPortal, voidChaser, cameo, hudName, hudLives, hudColor } = S);
+    ctx = mainCtx;
+  }
+  function drawMpHud() {
+    if (hudName === null) return;
+    text(hudName, 10, 24, 18, hudColor || '#fff', '#3a2400', 'left');
+    for (let k = 0; k < 3; k++) text(k < hudLives ? '❤' : '♡', W - 70 + k * 24, 24, 22, k < hudLives ? '#ff4a6a' : '#888');
+  }
+  // ---------- Layout: geteilter Bildschirm ----------
+  const mainCtx = ctx;
+  const mainEl = canvas.parentElement;
+  function layoutMp() {
+    const others = MP.on && MP.started ? [...MP.players.entries()] : [];
+    // alte Felder entfernen, neue anlegen
+    for (const el of [...mainEl.querySelectorAll('canvas.ghost')]) if (!others.some(([id]) => el.dataset.id === id)) el.remove();
+    others.forEach(([id, p], i) => {
+      p.color = MP_COLORS[(i + 1) % 4];
+      if (!p.cv || !p.cv.isConnected) { p.cv = document.createElement('canvas'); p.cv.className = 'ghost'; p.cv.dataset.id = id; p.cv.addEventListener('pointerdown', (e) => { e.preventDefault(); flap(); }); mainEl.appendChild(p.cv); p.ctx = p.cv.getContext('2d'); }
+      const dpr = Math.min(window.devicePixelRatio || 1, 3); p.cv.width = W * dpr; p.cv.height = H * dpr;
+    });
+    const n = 1 + others.length, vw = window.innerWidth, vh = window.innerHeight;
+    mainEl.classList.toggle('mp', n > 1);
+    let h;
+    if (n <= 1) { canvas.style.height = ''; canvas.style.width = ''; for (const el of mainEl.querySelectorAll('canvas.ghost')) el.remove(); return; }
+    if (n === 2) h = Math.min(vh - 12, (vw / 2 - 12) * 1.5);
+    else h = Math.min(vh / 2 - 10, (vw / 2 - 12) * 1.5);
+    mainEl.style.gridTemplateColumns = 'repeat(2, auto)';
+    for (const el of [canvas, ...mainEl.querySelectorAll('canvas.ghost')]) { el.style.height = h + 'px'; el.style.width = (h / 1.5) + 'px'; }
+  }
+  window.addEventListener('resize', () => { if (MP.on) layoutMp(); });
+  // ---------- Menü (HTML über dem Spielfeld) ----------
+  const css = document.createElement('style');
+  css.textContent = `main.mp{display:grid;gap:8px;align-content:center;justify-content:center}
+  #mpBtn{position:fixed;left:50%;bottom:max(16px,4vh);transform:translateX(-50%);z-index:5;font:900 18px "Trebuchet MS",system-ui,sans-serif;padding:10px 18px;border-radius:14px;border:3px solid #3a2400;background:#ffd23f;color:#3a2400;cursor:pointer;box-shadow:0 4px 0 #3a2400}
+  .mpBox{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(20,10,35,.7)}
+  .mpBox>div{background:#fff7e0;border:4px solid #3a2400;border-radius:18px;padding:18px;width:min(360px,92vw);font:700 16px "Trebuchet MS",system-ui,sans-serif;color:#3a2400;text-align:center}
+  .mpBox h2{margin:0 0 10px;font-size:26px}.mpBox input{font:800 18px system-ui;padding:8px;border-radius:10px;border:2px solid #3a2400;width:100%;text-align:center;margin:6px 0;text-transform:none}
+  .mpBox button{font:900 17px "Trebuchet MS",system-ui,sans-serif;padding:10px 14px;border-radius:12px;border:3px solid #3a2400;background:#ffd23f;color:#3a2400;cursor:pointer;margin:5px 3px;min-width:44%}
+  .mpBox button.alt{background:#e8e0d0}.mpBox .code{font:900 40px monospace;letter-spacing:6px;color:#c0392b;margin:6px 0}.mpBox ul{list-style:none;padding:0;margin:8px 0}.mpBox li{padding:4px;font-size:18px}
+  .mpBox .st{min-height:22px;color:#a04000;font-size:14px;margin-top:6px}`;
+  document.head.appendChild(css);
+  const mpBtn = document.createElement('button'); mpBtn.id = 'mpBtn'; mpBtn.textContent = '👥 Mehrspieler (2–4)'; document.body.appendChild(mpBtn);
+  const box = document.createElement('div'); box.className = 'mpBox'; box.style.display = 'none'; document.body.appendChild(box);
+  const resBox = document.createElement('div'); resBox.className = 'mpBox'; resBox.style.display = 'none'; document.body.appendChild(resBox);
+  for (const el of [mpBtn, box, resBox]) { el.addEventListener('pointerdown', (e) => e.stopPropagation()); el.addEventListener('keydown', (e) => e.stopPropagation()); }
+  let savedName = ''; try { savedName = localStorage.getItem('summ-mp-name') || ''; } catch (e) {}
+  function mpStatus(t) { const s = box.querySelector('.st'); if (s) s.textContent = t; }
+  function showMenu() {
+    box.style.display = 'flex';
+    box.innerHTML = `<div><h2>👥 Mehrspieler</h2>Dein Name<input id="mpName" maxlength="14" value="${savedName.replace(/"/g, '')}" placeholder="Name">
+      <button id="mpCreate">Raum erstellen</button><br>oder Code von deinem Freund:<input id="mpCode" maxlength="4" placeholder="CODE" style="text-transform:uppercase">
+      <button id="mpJoin">Beitreten</button><button id="mpClose" class="alt">Zurück</button><div class="st"></div>
+      <div style="font-size:13px;font-weight:600;margin-top:8px">Bis zu 4 Spieler · geteilter Bildschirm · jeder hat 3 Leben · wer am weitesten kommt, gewinnt!</div></div>`;
+    const nm = () => { const v = box.querySelector('#mpName').value.trim() || 'Spieler'; savedName = v; try { localStorage.setItem('summ-mp-name', v); } catch (e) {} return v; };
+    box.querySelector('#mpClose').onclick = () => { box.style.display = 'none'; };
+    box.querySelector('#mpCreate').onclick = () => {
+      MP.name = nm(); MP.host = true; MP.on = true; MP.players.clear();
+      const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; MP.code = ''; for (let k = 0; k < 4; k++) MP.code += A[Math.floor(Math.random() * A.length)];
+      mpStatus('⏳ Verbinde …'); loadMqtt(() => mpConnect(0, () => renderLobby()));
+    };
+    box.querySelector('#mpJoin').onclick = () => {
+      const code = box.querySelector('#mpCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length !== 4) { mpStatus('Bitte den 4-stelligen Code eingeben.'); return; }
+      MP.name = nm(); MP.host = false; MP.on = true; MP.code = code; MP.players.clear(); MP.joined = false;
+      mpStatus('⏳ Suche Raum ' + code + ' …');
+      loadMqtt(() => mpConnect(0, () => { mpSend({ t: 'hello', name: MP.name }); let tries = 0; const iv = setInterval(() => { if (!MP.on || MP.joined || MP.started) { clearInterval(iv); return; } if (++tries > 6) { clearInterval(iv); mpStatus('❌ Raum ' + code + ' nicht gefunden. Ist der Code richtig?'); return; } mpSend({ t: 'hello', name: MP.name }); }, 1500); }));
+    };
+  }
+  function renderLobby() {
+    if (!MP.on || MP.started) return;
+    if (!MP.host && !MP.joined) return;
+    box.style.display = 'flex';
+    const list = [[MP.id, MP.name + ' (du)']].concat([...MP.players.entries()].map(([id, p]) => [id, p.name]));
+    box.innerHTML = `<div><h2>👥 Raum</h2>Code für deine Freunde:<div class="code">${MP.code}</div>
+      <ul>${list.map((q, i) => `<li style="color:${MP_COLORS[i % 4]};text-shadow:0 1px 0 #3a2400">● ${q[1].replace(/</g, '')}</li>`).join('')}</ul>
+      ${MP.host ? `<button id="mpGo" ${list.length < 2 ? 'disabled style="opacity:.5"' : ''}>▶ Start (${list.length}/4)</button>` : '<div>Warte, bis der Host startet …</div>'}
+      <button id="mpBack" class="alt">Verlassen</button><div class="st">${MP.host && list.length < 2 ? 'Warte auf Mitspieler …' : ''}</div></div>`;
+    box.querySelector('#mpBack').onclick = () => { box.style.display = 'none'; mpLeave(); };
+    const go = box.querySelector('#mpGo');
+    if (go) go.onclick = () => { if (MP.players.size < 1) return; const seed = Math.floor(Math.random() * 1e9); mpSend({ t: 'start', seed, at: Date.now() + 3500 }); mpBegin(seed, 3500); };
+  }
+  function hideLobby() { box.style.display = 'none'; }
+  function hideResults() { resBox.style.display = 'none'; }
+  function showResults() {
+    const all = [{ name: MP.name + ' (du)', score, me: true }].concat([...MP.players.values()].map((p) => ({ name: p.name, score: p.st ? p.st.score : 0 })));
+    all.sort((a, b) => b.score - a.score);
+    const top = all[0].score, winners = all.filter((q) => q.score === top);
+    resBox.style.display = 'flex';
+    resBox.innerHTML = `<div><h2>${winners.length > 1 ? '🤝 Unentschieden!' : winners[0].me ? '🏆 DU HAST GEWONNEN!' : '🏆 ' + winners[0].name.replace(/</g, '') + ' gewinnt!'}</h2>
+      <ul>${all.map((q, i) => `<li>${['🥇', '🥈', '🥉', '4.'][i]} ${q.name.replace(/</g, '')} – <b>${q.score}</b></li>`).join('')}</ul>
+      ${MP.host ? '<button id="mpAgain">🔁 Nochmal</button>' : '<div>Der Host kann eine neue Runde starten.</div>'}<button id="mpEnd" class="alt">Verlassen</button></div>`;
+    resBox.querySelector('#mpEnd').onclick = () => mpLeave();
+    const ag = resBox.querySelector('#mpAgain');
+    if (ag) ag.onclick = () => { const seed = Math.floor(Math.random() * 1e9); mpSend({ t: 'start', seed, at: Date.now() + 3500 }); mpBegin(seed, 3500); };
+  }
+  mpBtn.onclick = () => { ensureAudio(); showMenu(); };
+  setInterval(() => { mpBtn.style.display = state === 'ready' && !MP.on ? 'block' : 'none'; }, 200);
+  window.addEventListener('beforeunload', () => { if (MP.on) mpSend({ t: 'bye' }); });
+  function drawMpExtras() {
+    drawMpHud();
+    if (ctx !== mainCtx || !MP.on || !MP.started) return;
+    if (MP.startAt) { const s = Math.ceil((MP.startAt - performance.now()) / 1000); text(s > 0 ? String(s) : 'LOS!', W / 2, H / 2 - 60, 90, '#ffd23f'); text('Gleich geht es los!', W / 2, H / 2 + 10, 22); }
+    if (state === 'over' && !MP.finished) text('Warte auf die anderen …', W / 2, H - 40, 20, '#ffe14d');
+  }
+
   let last = performance.now();
   function loop(now) {
     const dt = Math.min((now - last) / 1000, 1 / 30);
     last = now;
     update(dt);
+    mpTick(dt);
+    if (MP.on && MP.started) { hudName = MP.name; hudLives = MP.lives; hudColor = MP_COLORS[0]; } else hudName = null;
     draw();
+    if (MP.on && MP.started) for (const p of MP.players.values()) drawGhost(p);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
