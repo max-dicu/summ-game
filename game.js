@@ -2741,17 +2741,20 @@
     });
     const n = 1 + others.length, vw = window.innerWidth, vh = window.innerHeight;
     mainEl.classList.toggle('mp', n > 1);
-    let h;
-    if (n <= 1) { canvas.style.height = ''; canvas.style.width = ''; for (const el of mainEl.querySelectorAll('canvas.ghost')) el.remove(); return; }
-    if (n === 2) h = Math.min(vh - 12, (vw / 2 - 12) * 1.5);
-    else h = Math.min(vh / 2 - 10, (vw / 2 - 12) * 1.5);
-    mainEl.style.gridTemplateColumns = 'repeat(2, auto)';
-    for (const el of [canvas, ...mainEl.querySelectorAll('canvas.ghost')]) { el.style.height = h + 'px'; el.style.width = (h / 1.5) + 'px'; }
+    if (n <= 1) { canvas.style.height = ''; canvas.style.width = ''; canvas.style.borderColor = ''; for (const el of mainEl.querySelectorAll('canvas.ghost')) el.remove(); return; }
+    // beste Aufteilung suchen: so groß wie möglich (Handy hochkant: untereinander, Laptop: nebeneinander)
+    const G = 6, pad = 8; let best = { h: 0, cols: 1 };
+    for (let cols = 1; cols <= n; cols++) { const rows = Math.ceil(n / cols); const h = Math.min((vh - pad * 2 - G * (rows - 1)) / rows, ((vw - pad * 2 - G * (cols - 1)) / cols) * 1.5); if (h > best.h) best = { h, cols }; }
+    const h = Math.floor(best.h);
+    mainEl.style.gridTemplateColumns = 'repeat(' + best.cols + ', auto)';
+    canvas.style.borderColor = MP_COLORS[0];
+    others.forEach(([id, p]) => { if (p.cv) p.cv.style.borderColor = p.color; });
+    for (const el of [canvas, ...mainEl.querySelectorAll('canvas.ghost')]) { el.style.height = h + 'px'; el.style.width = Math.floor(h / 1.5) + 'px'; }
   }
   window.addEventListener('resize', () => { if (MP.on) layoutMp(); });
   // ---------- Menü (HTML über dem Spielfeld) ----------
   const css = document.createElement('style');
-  css.textContent = `main.mp{display:grid;gap:8px;align-content:center;justify-content:center}
+  css.textContent = `main.mp{display:grid;gap:6px;align-content:center;justify-content:center;padding:8px;box-sizing:border-box;width:100vw;height:100vh;height:100dvh}main.mp canvas{border:3px solid #ffd23f;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.35);box-sizing:border-box;max-width:none;max-height:none}
   #mpBtn{position:fixed;left:50%;bottom:max(16px,4vh);transform:translateX(-50%);z-index:5;font:900 18px "Trebuchet MS",system-ui,sans-serif;padding:10px 18px;border-radius:14px;border:3px solid #3a2400;background:#ffd23f;color:#3a2400;cursor:pointer;box-shadow:0 4px 0 #3a2400}
   .mpBox{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(20,10,35,.7)}
   .mpBox>div{background:#fff7e0;border:4px solid #3a2400;border-radius:18px;padding:18px;width:min(360px,92vw);font:700 16px "Trebuchet MS",system-ui,sans-serif;color:#3a2400;text-align:center}
