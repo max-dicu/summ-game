@@ -2481,7 +2481,7 @@
 
   function drawUI() {
     if (state === 'ready') {
-      text('Summ!', W / 2, 130, 64, '#ffd23f');
+      text('Viktors', W / 2, 100, 40, '#ffd23f'); text('Flatter-Flug', W / 2, 150, 52, '#ffd23f');
       const pulse = 0.6 + Math.sin(time * 4) * 0.4;
       ctx.globalAlpha = pulse;
       text('Tippen oder Leertaste', W / 2, 380, 22);
